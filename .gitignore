@@ -1,0 +1,58 @@
+# --- secrets: never commit ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+secrets/
+google-service-account*.json
+*-service-account.json
+google-key.json
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Node / Vite ---
+node_modules/
+dist/
+.vite/
+*.local
+
+# --- build output ---
+build/
+.cache/
+
+# --- backups (kept outside the repo; this is belt-and-braces) ---
+*.bak
+*.bak.*
+backups/
+*.dump
+*.sql.gz
+
+# --- customer data / uploads ---
+uploads/
+*.xlsx
+*.xls
+*.csv
+*.pdf
+
+# --- logs & runtime ---
+*.log
+pids/
+*.pid
+
+# --- editor / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
