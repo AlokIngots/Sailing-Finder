@@ -1,0 +1,609 @@
+<title>Sailing Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --navy:#000C2E; --ground:#F4F6F9; --card:#FFFFFF; --border:#E7EAF0; --border-strong:#CBD2DD;
+    --muted:#5B6473; --muted-2:#8A93A3; --signal:#BC0300; --signal-bg:#FBECEC; --logo:#E5531A;
+    --focus:#2F6BFF; --wa:#1EA855; --ok:#0F7A4D; --ok-bg:#E8F5EE; --amber:#9A6A00; --amber-bg:#FBF1DC;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --display:"Inter Tight","Inter",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--navy);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  body.customer .internal{display:none!important}
+  .wrap{max-width:900px;margin:0 auto;padding-inline:16px}
+
+  header.top{position:sticky;top:0;z-index:20;background:rgba(244,246,249,.92);backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--border)}
+  .top-in{display:flex;align-items:center;gap:11px;padding-block:12px;max-width:900px;margin:0 auto;padding-inline:16px}
+  .mark{width:28px;height:28px;border-radius:7px;background:var(--navy);display:grid;place-items:center;flex:none}
+  .mark span{width:11px;height:11px;border-radius:3px;background:var(--logo)}
+  .brand h1{font-family:var(--display);font-weight:700;font-size:16px;margin:0;letter-spacing:-.01em}
+  .brand p{margin:0;color:var(--muted-2);font-size:12px}
+  .nav{margin-left:auto;display:flex;gap:4px;background:#fff;border:1px solid var(--border-strong);border-radius:10px;padding:3px}
+  .nav button{appearance:none;border:0;background:transparent;font-family:var(--sans);font-size:13px;font-weight:600;padding:7px 13px;border-radius:8px;cursor:pointer;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+  .nav button[aria-current="true"]{background:var(--navy);color:#fff}
+  .nav .badge{font-size:10.5px;font-weight:700;background:var(--logo);color:#fff;border-radius:999px;padding:1px 6px;min-width:17px;text-align:center}
+  .nav button[aria-current="true"] .badge{background:#fff;color:var(--navy)}
+  .viewtoggle{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer;user-select:none;margin-left:10px}
+  .switch{width:38px;height:22px;border-radius:999px;background:var(--border-strong);position:relative;transition:.15s;flex:none}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .viewtoggle input{position:absolute;opacity:0;width:0;height:0}
+  .viewtoggle input:checked + .switch{background:var(--navy)}
+  .viewtoggle input:checked + .switch::after{transform:translateX(16px)}
+
+  .view{display:none} .view.active{display:block}
+
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-top:18px}
+  .row{display:flex;gap:12px;flex-wrap:wrap} .row + .row{margin-top:14px}
+  .control{display:flex;flex-direction:column;gap:6px;flex:1 1 200px}
+  .control.dates{flex:1 1 300px}
+  label.lbl{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-2)}
+  select,input[type="date"]{font-family:var(--sans);font-size:14.5px;color:var(--navy);background:var(--card);border:1px solid var(--border-strong);border-radius:11px;padding:11px 13px;width:100%;height:44px}
+  select{appearance:none;cursor:pointer;padding-right:36px;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235B6473' stroke-width='2'><path d='m6 9 6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 12px center}
+  .pair{display:flex;align-items:center;gap:8px} .pair span{color:var(--muted-2);font-size:12px;flex:none}
+  :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+  .bar{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+  .count{font-size:13.5px;color:var(--muted)} .count b{color:var(--navy);font-weight:700;font-variant-numeric:tabular-nums}
+  .spacer{flex:1 1 auto}
+  .seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;background:#fff}
+  .seg button{appearance:none;border:0;background:#fff;font-family:var(--sans);font-size:12.5px;font-weight:500;padding:8px 12px;cursor:pointer;color:var(--navy);border-right:1px solid var(--border)}
+  .seg button:last-child{border-right:0}
+  .seg button[aria-pressed="true"]{background:var(--navy);color:#fff}
+  .minisort{height:38px;padding:7px 30px 7px 11px;border-radius:9px;font-size:12.5px;width:auto}
+  .ttag{font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:2px 7px;border-radius:6px}
+  .ttag.direct{background:var(--ok-bg);color:var(--ok)}
+  .ttag.indirect{background:#EEF2F8;color:#455066}
+
+  .actions{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .btn{appearance:none;font-family:var(--sans);font-size:13px;font-weight:600;border-radius:10px;padding:9px 14px;cursor:pointer;border:1px solid var(--border-strong);background:#fff;color:var(--navy);display:inline-flex;align-items:center;gap:6px}
+  .btn:hover{border-color:var(--muted-2)}
+  .btn.primary{background:var(--navy);border-color:var(--navy);color:#fff}
+  .btn.wa{background:var(--wa);border-color:var(--wa);color:#fff}
+  .btn.ghost{border-color:transparent;background:transparent;color:var(--muted);padding-inline:8px}
+  .btn.ghost:hover{color:var(--navy)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.sm{font-size:12px;padding:6px 11px}
+
+  .mailbox{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-top:12px}
+  .mailbox h4{font-family:var(--display);margin:0 0 10px;font-size:14px}
+  .mailrow{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end} .mailrow .control{flex:1 1 240px}
+  input[type="email"],input[type="text"],input[type="tel"]{font-family:var(--sans);font-size:14.5px;color:var(--navy);background:#fff;border:1px solid var(--border-strong);border-radius:11px;padding:11px 13px;width:100%;height:44px}
+  .hint{font-size:12px;color:var(--muted-2);margin-top:10px;line-height:1.5}
+  .toast{font-size:12.5px;color:var(--ok);font-weight:600;margin-top:8px;min-height:16px}
+
+  .list{display:flex;flex-direction:column;gap:10px;margin-top:14px;margin-bottom:30px}
+  .sail{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:15px 17px;display:flex;align-items:center;gap:18px}
+  .sail .left{flex:1 1 auto;min-width:0}
+  .sail .vessel{font-weight:600;font-size:15px}
+  .sail .sub{color:var(--muted-2);font-size:12.5px;margin-top:2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .tag{font-size:11px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:6px;background:#EEF1F6;color:var(--navy)}
+  .dest{color:var(--muted);font-weight:500}
+  .right{text-align:right;flex:none;display:flex;gap:22px;align-items:center}
+  .dt .k{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-2);font-weight:600}
+  .dt .v{font-family:var(--display);font-weight:600;font-size:15px;font-variant-numeric:tabular-nums;margin-top:1px}
+  .transit{color:var(--muted);font-size:12.5px}
+  .soon{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;letter-spacing:.03em;color:var(--signal);background:var(--signal-bg);padding:2px 8px;border-radius:999px}
+  .soon i{width:6px;height:6px;border-radius:50%;background:var(--signal)}
+  .ttag{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px}
+  .ttag.direct{background:var(--ok-bg);color:var(--ok)}
+  .ttag.indirect{background:#EDEAF7;color:#4B3B8F}
+  .bookbtn{align-self:center;flex:none}
+
+  .empty{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:44px 22px;text-align:center;color:var(--muted)}
+  .empty h3{font-family:var(--display);color:var(--navy);margin:0 0 5px;font-size:16px}
+  .foot{color:var(--muted-2);font-size:11.5px;text-align:center;padding-block:24px;line-height:1.6}
+
+  .modal-bg{position:fixed;inset:0;z-index:60;background:rgba(0,12,46,.45);display:none;align-items:flex-start;justify-content:center;padding:24px 14px;overflow:auto}
+  .modal-bg.show{display:flex}
+  .modal{background:#fff;border:1px solid var(--border);border-radius:16px;width:100%;max-width:560px;padding:20px;box-shadow:0 18px 50px rgba(0,12,46,.25)}
+  .modal h3{font-family:var(--display);margin:0 0 2px;font-size:18px}
+  .modal .msub{color:var(--muted-2);font-size:12.5px;margin:0 0 14px}
+  .bk-summary{background:var(--ground);border:1px solid var(--border);border-radius:11px;padding:11px 13px;font-size:13px;margin-bottom:14px;line-height:1.7}
+  .bk-grid{display:flex;gap:12px;flex-wrap:wrap} .bk-grid .control{flex:1 1 160px} .bk-full{flex:1 1 100%}
+  .modal textarea{font-family:var(--sans);font-size:14px;color:var(--navy);background:#fff;border:1px solid var(--border-strong);border-radius:11px;padding:11px 13px;width:100%;min-height:150px;resize:vertical;line-height:1.6}
+  .modal-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;align-items:center}
+  .recips{font-size:12.5px;color:var(--muted);margin-top:12px} .recips b{color:var(--navy)}
+  .mtoast{font-size:12.5px;color:var(--ok);font-weight:600;min-height:16px}
+
+  .bkhead{display:flex;align-items:baseline;gap:10px;margin-top:18px}
+  .bkhead h2{font-family:var(--display);font-size:18px;margin:0} .bkhead p{color:var(--muted-2);font-size:12.5px;margin:0}
+  .brow{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;margin-top:10px}
+  .brow:hover{border-color:var(--border-strong)}
+  .brow .bl{flex:1 1 auto;min-width:0}
+  .brow .ref{font-size:11.5px;color:var(--muted-2);font-variant-numeric:tabular-nums}
+  .brow .ves{font-weight:600;margin-top:1px} .brow .rt{font-size:12.5px;color:var(--muted);margin-top:1px}
+  .chip{font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 9px;border-radius:999px;white-space:nowrap;flex:none}
+  .chip.sent{background:var(--amber-bg);color:var(--amber)}
+  .chip.quotes{background:#E9EEF9;color:#274690}
+  .chip.booked{background:var(--ok-bg);color:var(--ok)}
+  .chip.docs{background:#EDEAF7;color:#4B3B8F}
+  .chevron{color:var(--muted-2);flex:none}
+
+  .crumb{display:flex;align-items:center;gap:8px;margin-top:16px;font-size:12.5px;color:var(--muted)}
+  .crumb a{color:var(--focus);cursor:pointer;text-decoration:none}
+  .shead{margin-top:8px}
+  .shead h2{font-family:var(--display);font-size:20px;margin:0}
+  .shead .meta{color:var(--muted);font-size:13px;margin-top:3px}
+  .step{background:var(--card);border:1px solid var(--border);border-radius:16px;margin-top:14px;overflow:hidden}
+  .step.current{border-color:var(--navy);box-shadow:0 4px 18px rgba(0,12,46,.08)}
+  .step-h{display:flex;align-items:center;gap:12px;padding:15px 17px}
+  .snum{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:12.5px;font-weight:700;background:#EEF1F6;color:var(--muted)}
+  .step.current .snum{background:var(--navy);color:#fff}
+  .step.done .snum{background:var(--ok);color:#fff}
+  .step-h .st{flex:1 1 auto}
+  .step-h .stt{font-family:var(--display);font-weight:600;font-size:15.5px}
+  .step-h .sts{font-size:12px;color:var(--muted-2);margin-top:1px}
+  .stflag{font-size:11px;font-weight:700;letter-spacing:.03em;padding:2px 9px;border-radius:999px;flex:none}
+  .stflag.done{background:var(--ok-bg);color:var(--ok)}
+  .stflag.now{background:var(--amber-bg);color:var(--amber)}
+  .stflag.wait{background:#EEF1F6;color:var(--muted-2)}
+  .step-body{padding:0 17px 17px;border-top:1px solid var(--border);margin-top:2px;padding-top:15px}
+  .step.collapsed .step-body{display:none}
+  .kv{display:flex;flex-wrap:wrap;gap:10px 26px;font-size:13.5px}
+  .kv div span{display:block;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-2);font-weight:600;margin-bottom:1px}
+  .kv div b{font-weight:600;font-variant-numeric:tabular-nums}
+  table.q{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
+  table.q th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-2);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border)}
+  table.q td{padding:8px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}
+  table.q tr.win td{background:var(--ok-bg)}
+  table.q input[type="text"]{height:38px}
+  .price{font-weight:700}
+  .best{font-size:10px;font-weight:700;color:var(--ok);background:var(--ok-bg);border-radius:999px;padding:1px 7px;margin-left:6px}
+  .docgrid{display:flex;flex-direction:column;gap:9px;margin-top:4px}
+  .docrow{display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--border);border-radius:11px}
+  .docrow .dn{flex:1 1 auto} .docrow .dn b{font-weight:600} .docrow .dn small{display:block;color:var(--muted-2);font-size:11.5px}
+  .attached{font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);border-radius:999px;padding:2px 8px}
+  .actbar{display:flex;gap:8px;margin-top:15px;flex-wrap:wrap;align-items:center}
+
+  #flash{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:70;background:var(--navy);color:#fff;font-size:13px;font-weight:600;padding:11px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,12,46,.3);opacity:0;pointer-events:none;transition:opacity .2s}
+  #flash.show{opacity:1}
+
+  @media (max-width:600px){
+    .sail{flex-direction:column;align-items:stretch;gap:12px}
+    .right{justify-content:space-between;text-align:left}
+    .brand p{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  /* login gate */
+  #gate{position:fixed;inset:0;z-index:100;background:var(--ground);display:flex;align-items:center;justify-content:center;padding:20px}
+  body.authed #gate{display:none}
+  #gate .box{background:#fff;border:1px solid var(--border);border-radius:16px;max-width:380px;width:100%;padding:26px 24px;box-shadow:0 18px 50px rgba(0,12,46,.12)}
+  #gate .brandrow{display:flex;align-items:center;gap:11px;margin-bottom:20px}
+  #gate h2{font-family:var(--display);font-size:18px;margin:0}
+  #gate .brandrow p{color:var(--muted-2);font-size:12.5px;margin:2px 0 0}
+  #gate label{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-2);display:block;margin-bottom:6px}
+  #gate input{width:100%;height:44px;border:1px solid var(--border-strong);border-radius:11px;padding:11px 13px;font-size:14.5px;font-family:var(--sans);margin-bottom:14px;color:var(--navy);background:#fff}
+  #gate .err{color:var(--signal);font-size:12.5px;min-height:16px;margin-bottom:8px}
+  #gate #lgBtn{width:100%;justify-content:center}
+  .logoutbtn{margin-left:6px}
+</style>
+
+<div id="gate"><div class="box">
+  <div class="brandrow"><div class="mark"><span></span></div><div><h2>Sailing Finder</h2><p>Alok Ingots &middot; sign in to continue</p></div></div>
+  <label for="lgUser">Username</label>
+  <input type="text" id="lgUser" autocomplete="username" autocapitalize="none" spellcheck="false">
+  <label for="lgPass">Password</label>
+  <input type="password" id="lgPass" autocomplete="current-password">
+  <div class="err" id="lgErr"></div>
+  <button class="btn primary" id="lgBtn">Sign in</button>
+</div></div>
+
+<header class="top">
+  <div class="top-in">
+    <div class="mark"><span></span></div>
+    <div class="brand"><h1>Sailing Finder</h1><p>Nhava Sheva &rarr; Europe &amp; Mediterranean</p></div>
+    <nav class="nav">
+      <button data-go="finder" aria-current="true">Find sailings</button>
+      <button data-go="bookings">My bookings <span class="badge" id="navCount">0</span></button>
+    </nav>
+    <label class="viewtoggle internal" title="Hide the internal tools for a clean screen to show a customer">
+      <input type="checkbox" id="custView"><span class="switch"></span>Customer view
+    </label>
+    <button class="btn ghost logoutbtn" id="logoutBtn" title="Sign out" hidden>Sign out</button>
+  </div>
+</header>
+
+<!-- ============ VIEW 1: FINDER ============ -->
+<div class="view active" id="v-finder">
+  <div class="wrap">
+    <div class="panel">
+      <div class="row">
+        <div class="control"><label class="lbl" for="country">Country</label><select id="country"></select></div>
+        <div class="control"><label class="lbl" for="dest">Port</label><select id="dest"></select></div>
+        <div class="control"><label class="lbl" for="car">Carrier</label><select id="car"></select></div>
+      </div>
+      <div class="row">
+        <div class="control dates"><label class="lbl">Departs between</label>
+          <div class="pair"><input type="date" id="dfrom" aria-label="Departs from"><span>to</span><input type="date" id="dto" aria-label="Departs to"></div></div>
+        <div class="control dates"><label class="lbl">Arrives between</label>
+          <div class="pair"><input type="date" id="afrom" aria-label="Arrives from"><span>to</span><input type="date" id="ato" aria-label="Arrives to"></div></div>
+      </div>
+    </div>
+
+    <div class="bar">
+      <div class="count" id="count" aria-live="polite">&mdash;</div>
+      <div class="spacer"></div>
+      <div class="seg" id="typeSeg" role="group" aria-label="Shipment type">
+        <button data-t="all" aria-pressed="true">All</button>
+        <button data-t="direct" aria-pressed="false">Direct</button>
+        <button data-t="indirect" aria-pressed="false">Indirect</button>
+      </div>
+      <div class="seg" id="viewSeg" role="group" aria-label="View">
+        <button data-v="all" aria-pressed="true">All sailings</button>
+        <button data-v="next" aria-pressed="false">Next per port</button>
+      </div>
+      <select id="sort" class="minisort" aria-label="Sort by">
+        <option value="etd">Soonest departure</option>
+        <option value="transit">Fastest transit</option>
+        <option value="eta">Soonest arrival</option>
+      </select>
+    </div>
+
+    <div class="actions internal">
+      <button class="btn ghost" id="reset">Reset</button>
+      <div class="spacer"></div>
+      <button class="btn" id="copyBtn">Copy list</button>
+      <button class="btn" id="dlBtn">Download</button>
+      <button class="btn wa" id="waBtn">WhatsApp</button>
+      <button class="btn primary" id="emailBtn">Email these</button>
+    </div>
+
+    <div class="mailbox internal" id="mailbox" hidden>
+      <h4>Email these sailings</h4>
+      <div class="mailrow">
+        <div class="control"><label class="lbl" for="to">Send to</label><input type="email" id="to" placeholder="name@company.com" autocomplete="off"></div>
+        <button class="btn primary" id="sendMail">Send email</button>
+        <button class="btn ghost" id="closeMail">Close</button>
+      </div>
+      <div class="toast" id="toast"></div>
+      <div class="hint">Send emails the sailing list directly from your Google account &mdash; one click, no email app.</div>
+    </div>
+
+    <div class="mailbox internal" id="wabox" hidden>
+      <h4>Send these sailings on WhatsApp (PDF)</h4>
+      <div class="mailrow">
+        <div class="control"><label class="lbl" for="waSelect">Saved numbers</label>
+          <select id="waSelect"><option value="">&mdash; choose a saved number &mdash;</option></select></div>
+        <div class="control"><label class="lbl" for="waManual">Or type a new number</label>
+          <input type="tel" id="waManual" placeholder="98672 00083" autocomplete="off"></div>
+      </div>
+      <div class="mailrow" id="waRememberRow" hidden>
+        <label class="lbl" style="display:flex;align-items:center;gap:6px;text-transform:none;font-size:13px;">
+          <input type="checkbox" id="waRemember" style="width:auto;height:auto;"> Remember this number</label>
+        <div class="control"><input type="text" id="waName" placeholder="Name / label (optional)" autocomplete="off"></div>
+      </div>
+      <div class="mailrow"><button class="btn primary" id="waSend">Send PDF on WhatsApp</button><button class="btn ghost" id="waClose">Close</button></div>
+      <div class="hint">Applies the filters above, makes a PDF of those sailings, and sends it to the WhatsApp number with a short note.</div>
+    </div>
+
+    <div class="list" id="list"></div>
+    <div class="foot" id="foot"></div>
+  </div>
+</div>
+
+<!-- ============ VIEW 2: BOOKINGS ============ -->
+<div class="view" id="v-bookings">
+  <div class="wrap">
+    <div class="bkhead"><h2>My bookings</h2><p>Every shipment you've booked and where it stands.</p></div>
+    <div id="bookingsList"></div>
+    <div class="foot">Newest first &middot; click a shipment to work its steps.</div>
+  </div>
+</div>
+
+<!-- ============ VIEW 3: SHIPMENT ============ -->
+<div class="view" id="v-shipment">
+  <div class="wrap">
+    <div class="crumb"><a data-go="bookings">My bookings</a> <span>/</span> <span id="shRef"></span></div>
+    <div class="shead"><h2 id="shTitle"></h2><div class="meta" id="shMeta"></div></div>
+    <div id="steps"></div>
+    <div class="foot">One shipment, three steps &mdash; the screen only asks for what's next.</div>
+  </div>
+</div>
+
+<div class="modal-bg" id="bookModal"><div class="modal">
+  <div id="bkForm">
+    <h3>Enquire about this sailing</h3>
+    <p class="msub">Fill the details, review the email, then send it to your forwarders.</p>
+    <div class="bk-summary" id="bkSummary"></div>
+    <div class="bk-grid">
+      <div class="control"><label class="lbl" for="bkStuff">Stuffing date</label><input type="date" id="bkStuff"></div>
+      <div class="control"><label class="lbl" for="bkContainer">Containers</label><input type="text" id="bkContainer" placeholder="e.g. 2 x 20 ft"></div>
+    </div>
+    <div class="bk-grid" style="margin-top:12px">
+      <div class="control"><label class="lbl" for="bkNet">Net weight</label><input type="text" id="bkNet" placeholder="e.g. 42,000 kg"></div>
+      <div class="control"><label class="lbl" for="bkGross">Gross weight</label><input type="text" id="bkGross" placeholder="e.g. 44,500 kg"></div>
+    </div>
+    <div class="bk-grid" style="margin-top:12px"><div class="control bk-full"><label class="lbl" for="bkCommodity">Commodity</label><input type="text" id="bkCommodity" value="Stainless steel bright bars"></div></div>
+    <div class="bk-grid" style="margin-top:12px"><div class="control bk-full"><label class="lbl" for="bkRemarks">Target rate / remarks</label><textarea id="bkRemarks" style="min-height:70px" placeholder="Any target rate, free-time need, or note"></textarea></div></div>
+    <div class="recips" id="bkRecips"></div>
+    <div class="modal-actions"><button class="btn primary" id="bkReview">Review request</button><button class="btn ghost" id="bkCancel">Cancel</button></div>
+  </div>
+  <div id="bkReviewPane" hidden>
+    <h3>Review &amp; send</h3>
+    <p class="msub">This email goes to each forwarder separately &mdash; they won't see one another.</p>
+    <div class="control"><label class="lbl" for="bkSubject">Subject</label><input type="text" id="bkSubject"></div>
+    <div class="control" style="margin-top:12px"><label class="lbl" for="bkBody">Email</label><textarea id="bkBody"></textarea></div>
+    <div class="recips" id="bkRecips2"></div><div class="mtoast" id="bkToast"></div>
+    <div class="modal-actions"><button class="btn primary" id="bkSend">Send to forwarders</button><button class="btn ghost" id="bkBack">Back to edit</button></div>
+  </div>
+</div></div>
+<div id="flash"></div>
+
+<script>
+let DATA = [], ROWS = [], AUTH = "";   // schedule loads only AFTER login
+const HAS_GOOGLE = (window.google && google.script && google.script.run);
+let FORWARDERS = [];   // [{name,email}] loaded from server
+let SHIP = [];         // bookings loaded from server
+
+/* every data call goes through here so the login token is always sent */
+function srv(method, args, ok, err){
+  if(!HAS_GOOGLE){ if(err) err({message:"preview"}); return; }
+  var r = google.script.run
+    .withSuccessHandler(ok || function(){})
+    .withFailureHandler(function(e){ var m=(e&&e.message)||""; if(/sign in/i.test(m)){ forceLogout(); } if(err) err(e); });
+  r[method].apply(r, [AUTH].concat(args || []));
+}
+
+const COUNTRIES={BE:"Belgium",NL:"Netherlands",IT:"Italy",PT:"Portugal",PL:"Poland",TR:"Turkey",SA:"Saudi Arabia",AE:"United Arab Emirates",DE:"Germany",FR:"France",ES:"Spain",GB:"United Kingdom",GR:"Greece",EG:"Egypt",US:"United States",CA:"Canada",BR:"Brazil",ZA:"South Africa",SG:"Singapore",MY:"Malaysia",CN:"China",IN:"India"};
+const countryOf=code=>{const cc=(code||"").slice(0,2).toUpperCase();return {cc,name:COUNTRIES[cc]||cc};};
+function parseDate(s){if(!s)return null;s=String(s).trim().split(/[ T]/)[0];let m;
+  if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/)))return new Date(+m[1],+m[2]-1,+m[3]);
+  if((m=s.match(/^(\d{2})-(\d{2})-(\d{4})$/)))return new Date(+m[3],+m[2]-1,+m[1]);
+  if((m=s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/)))return new Date(+m[3],+m[2]-1,+m[1]);
+  const d=new Date(s);return isNaN(d)?null:d;}
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmt=d=>d?(d.getDate()+" "+MON[d.getMonth()]+" "+d.getFullYear()):"—";
+const fmtShort=d=>d?(d.getDate()+" "+MON[d.getMonth()]):"—";
+function tidy(row){let v=row.vessel_name||"",voy=row.voyage_no||"";const pm=v.match(/\((\d{2,}[A-Z])\)/);if(!voy&&pm)voy=pm[1];v=v.replace(/\s*\([^)]*\)/g,"").trim();return {vessel:v||row.vessel_name,voyage:voy};}
+const TODAY=new Date();TODAY.setHours(0,0,0,0);const DAY=86400000;
+function shipType(v){var s=String(v==null?"":v).trim();if(s===""||s.toLowerCase()==="transshipment")return"";var n=parseFloat(s);if(isNaN(n))return"";return n===0?"direct":"indirect";}
+/* ---------- FILTERS ---------- */
+const countrySel=document.getElementById("country"),destSel=document.getElementById("dest"),carSel=document.getElementById("car");
+function buildFromData(data){
+  DATA=data||[];
+  ROWS=DATA.map(r=>{const t=tidy(r);const c=countryOf(r.pod_code);const tr=parseInt(r.transit_days,10);return {carrier:r.carrier,pod_code:r.pod_code,pod:r.pod_name,cc:c.cc,country:c.name,vessel:t.vessel,voyage:t.voyage,etd:parseDate(r.etd),eta:parseDate(r.eta),transit:isNaN(tr)?null:tr,direct:shipType(r.transshipment)};});
+  const countryList=[...new Map(ROWS.map(r=>[r.cc,r.country])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
+  countrySel.innerHTML='<option value="">All countries</option>'+countryList.map(([cc,n])=>'<option value="'+cc+'">'+n+'</option>').join("");
+  const carriers=[...new Set(ROWS.map(r=>r.carrier))].sort();
+  carSel.innerHTML='<option value="">All carriers</option>'+carriers.map(c=>'<option value="'+c+'">'+c+'</option>').join("");
+  fillPorts();
+}
+function fillPorts(){const cc=countrySel.value;const ports=[...new Map(ROWS.filter(r=>!cc||r.cc===cc).map(r=>[r.pod_code,r.pod])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
+  destSel.innerHTML='<option value="">'+(cc?"All ports in "+(COUNTRIES[cc]||cc):"All ports")+'</option>'+ports.map(([c,n])=>'<option value="'+c+'">'+n+'</option>').join("");}
+
+let viewMode="all",typeMode="all";
+function sortRows(rows){const s=document.getElementById("sort").value;
+  return rows.sort((a,b)=>{if(s==="transit"){const av=a.transit==null?9e9:a.transit,bv=b.transit==null?9e9:b.transit;return av-bv||((a.etd?a.etd:9e15)-(b.etd?b.etd:9e15));}
+    const ak=(s==="eta"?a.eta:a.etd),bk=(s==="eta"?b.eta:b.etd);return (ak?ak.getTime():9e15)-(bk?bk.getTime():9e15);});}
+function currentRows(){const cc=countrySel.value,dp=destSel.value,cr=carSel.value;
+  const df=document.getElementById("dfrom").value?parseDate(document.getElementById("dfrom").value):null;
+  const dt=document.getElementById("dto").value?parseDate(document.getElementById("dto").value):null;
+  const af=document.getElementById("afrom").value?parseDate(document.getElementById("afrom").value):null;
+  const at=document.getElementById("ato").value?parseDate(document.getElementById("ato").value):null;
+  let rows=ROWS.filter(r=>{if(cc&&r.cc!==cc)return false;if(dp&&r.pod_code!==dp)return false;if(cr&&r.carrier!==cr)return false;
+    if(typeMode!=="all"&&r.direct!==typeMode)return false;
+    if(df&&r.etd&&r.etd<df)return false;if(dt&&r.etd&&r.etd>dt)return false;if(af&&r.eta&&r.eta<af)return false;if(at&&r.eta&&r.eta>at)return false;return true;});
+  if(viewMode==="next"){const best={};rows.forEach(r=>{const k=r.pod_code+"|"+r.carrier;const up=r.etd&&r.etd>=TODAY;
+    if(!best[k]){best[k]=r;return;}const cur=best[k];const curUp=cur.etd&&cur.etd>=TODAY;if(up&&!curUp){best[k]=r;return;}if(up===curUp&&r.etd&&cur.etd&&r.etd<cur.etd){best[k]=r;}});rows=Object.values(best);}
+  return sortRows(rows);}
+
+let LAST_ROWS=[];
+function render(){const rows=currentRows();LAST_ROWS=rows;
+  document.getElementById("count").innerHTML="<b>"+rows.length+"</b> sailing"+(rows.length===1?"":"s")+(viewMode==="next"?" (next per port)":"");
+  const list=document.getElementById("list");
+  if(!rows.length){list.innerHTML='<div class="empty"><h3>No sailings match</h3><div>Try a different country, port, carrier or date range.</div></div>';return;}
+  list.innerHTML=rows.map((r,i)=>{const soon=r.etd&&r.etd>=TODAY&&(r.etd-TODAY)<=3*DAY;
+    return '<div class="sail"><div class="left"><div class="vessel">'+r.vessel+'</div>'+
+      '<div class="sub"><span class="tag">'+r.carrier+'</span>'+(r.voyage?'<span>'+r.voyage+'</span>':'')+
+      (r.direct?'<span class="ttag '+r.direct+'">'+(r.direct==="direct"?"Direct":"Indirect")+'</span>':'')+
+      '<span class="dest">to '+r.pod+', '+r.country+'</span>'+(soon?'<span class="soon"><i></i>Leaving soon</span>':'')+'</div></div>'+
+      '<div class="right"><div class="dt"><div class="k">Departs</div><div class="v">'+fmtShort(r.etd)+'</div></div>'+
+      '<div class="dt"><div class="k">Arrives</div><div class="v">'+fmtShort(r.eta)+'</div>'+(r.transit!=null?'<div class="transit">'+r.transit+' days transit</div>':'')+'</div></div>'+
+      '<button class="btn primary bookbtn internal" data-idx="'+i+'">Enquire</button></div>';
+  }).join("");}
+
+/* ---------- text / copy / download / whatsapp / email (unchanged behaviour) ---------- */
+function whereLabel(){const cc=countrySel.value,dp=destSel.value;if(dp){const r=ROWS.find(x=>x.pod_code===dp);return r?r.pod+", "+r.country:"Europe & Mediterranean";}if(cc)return COUNTRIES[cc]||cc;return "Europe & Mediterranean";}
+function buildText(){const rows=currentRows(),where=whereLabel();
+  const lines=rows.map(r=>"• "+r.vessel+(r.voyage?" ("+r.voyage+")":"")+" — "+r.carrier+" — to "+r.pod+", "+r.country+" — Departs "+fmt(r.etd)+", Arrives "+fmt(r.eta)+(r.transit!=null?" ("+r.transit+" days)":""));
+  return {subject:"Sailing schedule — Nhava Sheva to "+where,body:"Sailing schedule from Nhava Sheva to "+where+"\n"+rows.length+" sailing(s), as of "+fmt(TODAY)+"\n\n"+lines.join("\n")+"\n\nCarrier estimates — please confirm cut-offs before booking.\n\nExport Team"};}
+function buildCSV(){const rows=currentRows();const head=["Carrier","Vessel","Voyage","Port","Country","Departs","Arrives","Transit (days)"];const esc=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  const lines=[head.map(esc).join(",")];rows.forEach(r=>lines.push([r.carrier,r.vessel,r.voyage,r.pod,r.country,fmt(r.etd),fmt(r.eta),(r.transit==null?"":r.transit)].map(esc).join(",")));return lines.join("\r\n");}
+function buildWaTable(){const rows=currentRows();const th=h=>'<th style="padding:5px 8px;border:1px solid #000C2E;text-align:left;">'+h+'</th>';const td=t=>'<td style="padding:4px 8px;border:1px solid #d9dee8;">'+(t==null?"":t)+'</td>';
+  const head='<tr style="background:#000C2E;color:#fff;">'+["Carrier","Vessel","Voyage","Port","Country","Departs","Arrives","Transit"].map(th).join("")+'</tr>';
+  const body=rows.map(r=>'<tr>'+[r.carrier,r.vessel,r.voyage||"",r.pod,r.country,fmt(r.etd),fmt(r.eta),(r.transit==null?"":r.transit+" d")].map(td).join("")+'</tr>').join("");
+  return {table:'<table style="border-collapse:collapse;font-size:11px;width:100%;">'+head+body+'</table>',count:rows.length,where:whereLabel()};}
+function toast(m){const t=document.getElementById("toast");if(!t)return;t.textContent=m;clearTimeout(t._t);t._t=setTimeout(()=>t.textContent="",4000);}
+function copyText(text,msg){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>flash(msg)).catch(()=>fallbackCopy(text,msg));}else fallbackCopy(text,msg);}
+function fallbackCopy(text,msg){const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");flash(msg);}catch(e){flash("Couldn't copy automatically.");}document.body.removeChild(ta);}
+
+document.getElementById("copyBtn").onclick=()=>{document.getElementById("mailbox").hidden=true;document.getElementById("wabox").hidden=true;const {body}=buildText();copyText(body,"Sailing list copied.");};
+document.getElementById("dlBtn").onclick=()=>{const csv=buildCSV();const fname="sailings_"+new Date().toISOString().slice(0,10)+".csv";
+  try{const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=fname;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1000);flash("Downloaded — opens in Excel.");}
+  catch(e){copyText(csv,"Couldn't download — CSV copied instead.");}};
+
+document.getElementById("waBtn").onclick=()=>{document.getElementById("mailbox").hidden=true;document.getElementById("wabox").hidden=false;loadWaContacts();document.getElementById("waManual").focus();};
+function loadWaContacts(){const sel=document.getElementById("waSelect");if(!HAS_GOOGLE)return;
+  srv("getWaContacts",[],function(list){sel.innerHTML='<option value="">— choose a saved number —</option>'+(list||[]).map(c=>'<option value="'+c.number+'">'+(c.name?c.name+" — ":"")+c.number+'</option>').join("");});}
+document.getElementById("waManual").addEventListener("input",e=>{document.getElementById("waRememberRow").hidden=!e.target.value.trim();});
+document.getElementById("waSelect").addEventListener("change",e=>{if(e.target.value){document.getElementById("waManual").value="";document.getElementById("waRememberRow").hidden=true;}});
+document.getElementById("waClose").onclick=()=>{document.getElementById("wabox").hidden=true;};
+document.getElementById("waSend").onclick=()=>{const sel=document.getElementById("waSelect").value.trim(),manual=document.getElementById("waManual").value.trim(),number=manual||sel;
+  if(!number){flash("Choose a saved number or type one.");return;}const {table,count,where}=buildWaTable();if(!count){flash("No sailings to send — adjust the filters.");return;}
+  const brief={line:"Sailing schedule — Nhava Sheva to "+where+" · "+count+" sailing"+(count===1?"":"s"),bodyValues:[where,fmt(TODAY),String(count)]};
+  if(!HAS_GOOGLE){flash("Preview can't send — works on the live web app.");return;}
+  const remember=(!!manual)&&document.getElementById("waRemember").checked,name=document.getElementById("waName").value.trim();flash("Sending PDF on WhatsApp…");
+  srv("sendWhatsAppPdf",[number,table,brief],function(){flash("Sent to "+number);if(remember)srv("saveWaContact",[name,number]);document.getElementById("wabox").hidden=true;},function(err){flash("Could not send: "+((err&&err.message)?err.message:"error"));});};
+
+document.getElementById("emailBtn").onclick=()=>{document.getElementById("wabox").hidden=true;document.getElementById("mailbox").hidden=false;document.getElementById("to").focus();};
+document.getElementById("closeMail").onclick=()=>{document.getElementById("mailbox").hidden=true;};
+document.getElementById("sendMail").onclick=()=>{const to=document.getElementById("to").value.trim();if(!to){toast("Enter an email address first.");return;}
+  const {subject,body}=buildText();const {table,count,where}=buildWaTable();const brief={line:"Sailing schedule — Nhava Sheva to "+where+" · "+count+" sailing"+(count===1?"":"s")};
+  if(HAS_GOOGLE){toast("Sending…");srv("sendMail",[to,subject,body,table,brief],function(){toast("Email sent to "+to);},function(err){toast("Could not send: "+((err&&err.message)?err.message:"error"));});}
+  else{copyText(subject+"\n\n"+body,"Preview can't send — email text copied.");}};
+
+/* view + sort + filter events */
+document.querySelectorAll("#viewSeg button").forEach(b=>{b.onclick=()=>{document.querySelectorAll("#viewSeg button").forEach(x=>x.setAttribute("aria-pressed","false"));b.setAttribute("aria-pressed","true");viewMode=b.dataset.v;render();};});
+document.querySelectorAll("#typeSeg button").forEach(b=>{b.onclick=()=>{document.querySelectorAll("#typeSeg button").forEach(x=>x.setAttribute("aria-pressed","false"));b.setAttribute("aria-pressed","true");typeMode=b.dataset.t;render();};});
+document.getElementById("sort").addEventListener("change",render);
+countrySel.onchange=()=>{fillPorts();render();};
+[destSel,carSel,"dfrom","dto","afrom","ato"].forEach(el=>{(typeof el==="string"?document.getElementById(el):el).addEventListener("change",render);});
+document.getElementById("reset").onclick=()=>{countrySel.value="";carSel.value="";["dfrom","dto","afrom","ato"].forEach(id=>document.getElementById(id).value="");
+  typeMode="all";document.querySelectorAll("#typeSeg button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.t==="all"?"true":"false"));fillPorts();render();};
+document.getElementById("custView").addEventListener("change",e=>{document.body.classList.toggle("customer",e.target.checked);});
+document.getElementById("foot").innerHTML="Carrier estimates &mdash; confirm cut-offs before booking.";
+
+/* ============ BOOKING FLOW ============ */
+function flash(m){var f=document.getElementById("flash");f.textContent=m;f.classList.add("show");clearTimeout(f._t);f._t=setTimeout(()=>f.classList.remove("show"),4500);}
+function refreshNav(){document.getElementById("navCount").textContent=SHIP.length;}
+function go(view){document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));document.getElementById("v-"+view).classList.add("active");
+  document.querySelectorAll(".nav button[data-go]").forEach(b=>b.setAttribute("aria-current",b.dataset.go===view?"true":"false"));if(view==="bookings")renderBookings();window.scrollTo(0,0);}
+document.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>go(b.dataset.go)));
+
+/* load forwarders + bookings from the sheet */
+function loadForwarders(){if(!HAS_GOOGLE){FORWARDERS=[{name:"Forwarder 1"},{name:"Forwarder 2"},{name:"Forwarder 3"}];return;}
+  srv("getForwarders",[],function(l){FORWARDERS=l||[];});}
+function loadBookings(cb){if(!HAS_GOOGLE){SHIP=[];refreshNav();if(cb)cb();return;}
+  srv("getBookings",[],function(list){SHIP=(list||[]).map(hydrate);refreshNav();if(cb)cb();},function(){if(cb)cb();});}
+function hydrate(s){s.etdD=parseDate(s.etd);s.etaD=parseDate(s.eta);return s;}
+
+/* Book button on a sailing */
+document.getElementById("list").addEventListener("click",e=>{var b=e.target.closest(".bookbtn");if(b)openBooking(LAST_ROWS[+b.dataset.idx]);});
+
+let BK_ROW=null,$=id=>document.getElementById(id);
+function fwdNames(){return FORWARDERS.map(f=>f.name);}
+function recipLine(){return FORWARDERS.length?('Will be emailed to: <b>'+fwdNames().join('</b>, <b>')+'</b>'):'No forwarder emails set yet — add them in Code.gs.';}
+function bookRef(){var d=new Date(),p=n=>String(n).padStart(2,"0");return 'BR-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes());}
+function openBooking(r){if(!r)return;BK_ROW=r;
+  $("bkSummary").innerHTML='<b>'+r.vessel+'</b>'+(r.voyage?' ('+r.voyage+')':'')+' — '+r.carrier+'<br>Nhava Sheva → '+r.pod+', '+r.country+'<br>Departs '+fmt(r.etd)+' · Arrives '+fmt(r.eta)+(r.transit!=null?' · '+r.transit+' days':'');
+  $("bkRecips").innerHTML=recipLine();["bkStuff","bkContainer","bkNet","bkGross","bkRemarks"].forEach(id=>$(id).value="");$("bkCommodity").value="Stainless steel bright bars";
+  $("bkForm").hidden=false;$("bkReviewPane").hidden=true;$("bkToast").textContent="";$("bookModal").classList.add("show");}
+function closeBooking(){$("bookModal").classList.remove("show");}
+function bookingObj(rf){var r=BK_ROW,g=id=>$(id).value.trim();
+  return {ref:rf,carrier:r.carrier,vessel:r.vessel,voyage:r.voyage,pol_code:"INNSA",pod_code:r.pod_code,pod:r.pod,country:r.country,
+    etd:fmt(r.etd),eta:fmt(r.eta),transit:(r.transit==null?"":r.transit),stuffing:g("bkStuff"),container:g("bkContainer"),
+    commodity:g("bkCommodity"),net_wt:g("bkNet"),gross_wt:g("bkGross"),remarks:g("bkRemarks")};}
+function buildEmail(){var r=BK_ROW,g=id=>$(id).value.trim(),rf=bookRef();
+  var subject="Booking request "+rf+" — Nhava Sheva to "+r.pod+", "+r.country+" ("+r.carrier+" "+r.vessel+")";var L=[];
+  L.push("We would like to book the shipment below. Please send your best all-in rate and the latest booking cut-off for this vessel.");L.push("");
+  L.push("Booking ref: "+rf);L.push("Carrier: "+r.carrier);L.push("Vessel / voyage: "+r.vessel+(r.voyage?" / "+r.voyage:""));
+  L.push("From: Nhava Sheva (INNSA)");L.push("To: "+r.pod+", "+r.country+(r.pod_code?" ("+r.pod_code+")":""));
+  L.push("ETD: "+fmt(r.etd)+"   ETA: "+fmt(r.eta)+(r.transit!=null?"   Transit: "+r.transit+" days":""));
+  if(g("bkStuff"))L.push("Stuffing date: "+g("bkStuff"));if(g("bkContainer"))L.push("Containers: "+g("bkContainer"));if(g("bkCommodity"))L.push("Commodity: "+g("bkCommodity"));
+  if(g("bkNet")||g("bkGross"))L.push("Weight: "+(g("bkNet")||"—")+" net"+(g("bkGross")?" / "+g("bkGross")+" gross":""));if(g("bkRemarks"))L.push("Remarks: "+g("bkRemarks"));
+  L.push("");L.push("Please confirm space and quote by return.");L.push("");L.push("Warm regards,");L.push("Export Team");L.push("Alok Ingots (Mumbai) Pvt. Ltd.");
+  return {ref:rf,subject:subject,body:L.join("\n")};}
+$("bkCancel").onclick=closeBooking;
+$("bkBack").onclick=()=>{$("bkReviewPane").hidden=true;$("bkForm").hidden=false;};
+$("bkReview").onclick=()=>{var e=buildEmail();$("bkSubject").value=e.subject;$("bkBody").value=e.body;$("bkRecips2").innerHTML=recipLine();$("bkForm").hidden=true;$("bkReviewPane").hidden=false;};
+$("bkSend").onclick=()=>{var subject=$("bkSubject").value.trim(),body=$("bkBody").value;
+  if(!FORWARDERS.length){$("bkToast").textContent="Add forwarder emails in Code.gs first.";return;}
+  var m=subject.match(/BR-\d{8}-\d{4}/),rf=m?m[0]:bookRef();
+  if(!HAS_GOOGLE){$("bkToast").textContent="Preview can't send — works on the live web app.";return;}
+  $("bkToast").textContent="Sending…";$("bkSend").disabled=true;
+  srv("sendBookingRequest",[subject,body,bookingObj(rf)],function(res){$("bkSend").disabled=false;closeBooking();loadBookings(function(){openShip(res.ref);});flash("Booking request "+res.ref+" sent to "+res.count+" forwarder"+(res.count===1?"":"s")+".");},function(err){$("bkSend").disabled=false;$("bkToast").textContent="Could not send: "+((err&&err.message)?err.message:"error");});};
+
+/* bookings list */
+const CHIP={sent:["sent","Request sent"],quotes:["quotes","Quotes in"],booked:["booked","Booked"],docs:["docs","Docs sent"]};
+function renderBookings(){const el=document.getElementById("bookingsList");
+  if(!SHIP.length){el.innerHTML='<div class="empty"><h3>No bookings yet</h3><div>Send an enquiry from Find sailings and it shows up here.</div></div>';return;}
+  el.innerHTML=SHIP.map(s=>{const c=CHIP[s.stage]||CHIP.sent;return '<div class="brow" data-open="'+s.ref+'"><div class="bl"><div class="ref">'+s.ref+'</div>'+
+    '<div class="ves">'+s.vessel+' &middot; '+s.carrier+'</div><div class="rt">Nhava Sheva → '+s.pod+', '+s.country+' &middot; ETD '+fmtShort(s.etdD)+'</div></div>'+
+    '<span class="chip '+c[0]+'">'+c[1]+'</span><span class="chevron">›</span></div>';}).join("");
+  el.querySelectorAll("[data-open]").forEach(r=>r.addEventListener("click",()=>openShip(r.dataset.open)));}
+
+/* shipment detail */
+let CUR=null;
+function openShip(rf){CUR=SHIP.find(s=>s.ref===rf);if(!CUR){go("bookings");return;}go("shipment");
+  document.getElementById("shRef").textContent=CUR.ref;document.getElementById("shTitle").textContent=CUR.vessel+" · "+CUR.carrier;
+  document.getElementById("shMeta").innerHTML="Nhava Sheva → "+CUR.pod+", "+CUR.country+" &middot; ETD "+fmt(CUR.etdD)+" · ETA "+fmt(CUR.etaD)+(CUR.transit?" · "+CUR.transit+" days":"");renderSteps();}
+function stepFlag(s){return s==="done"?'<span class="stflag done">Done</span>':s==="now"?'<span class="stflag now">Do this next</span>':'<span class="stflag wait">Waiting</span>';}
+function stepCard(n,title,sub,state,body){const cls="step "+(state==="now"?"current":state==="done"?"done":"")+(state==="wait"?" collapsed":"");
+  return '<div class="'+cls+'"><div class="step-h"><div class="snum">'+(state==="done"?"✓":n)+'</div><div class="st"><div class="stt">'+title+'</div><div class="sts">'+sub+'</div></div>'+stepFlag(state)+'</div><div class="step-body">'+body+'</div></div>';}
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+const DOC_FILES={PL:null,CI:null,VGM:null};
+function renderSteps(){const s=CUR;
+  const st1=(s.stage==="sent")?"now":"done";
+  const st2=(s.stage==="quotes")?"now":(s.stage==="sent"?"wait":"done");
+  const st3=(s.stage==="booked")?"now":(s.stage==="docs"?"done":"wait");
+
+  const s1='<div class="kv"><div><span>Carrier</span><b>'+esc(s.carrier)+'</b></div><div><span>Vessel / voyage</span><b>'+esc(s.vessel)+' / '+esc(s.voyage)+'</b></div>'+
+    '<div><span>Route</span><b>Nhava Sheva → '+esc(s.pod)+'</b></div><div><span>ETD</span><b>'+fmt(s.etdD)+'</b></div>'+
+    '<div><span>Containers</span><b>'+esc(s.container||"—")+'</b></div><div><span>Weight</span><b>'+esc(s.net||"—")+(s.gross?" / "+esc(s.gross):"")+'</b></div></div>'+
+    '<div class="actbar"><span style="font-size:12.5px;color:var(--muted)">Request emailed to '+fwdNames().map(f=>'<b>'+esc(f)+'</b>').join(', ')+'</span></div>';
+
+  let s2;
+  if(st2==="wait"){s2='<div style="font-size:13.5px;color:var(--muted)">Send the booking request first (step 1 is complete once you\'ve booked).</div>';}
+  else if(s.quotes&&s.quotes.length&&s.stage!=="quotes"){/* quotes saved + moved on */ s2=quotesTable(s);}
+  else if(s.quotes&&s.quotes.length){s2=quotesTable(s);}
+  else{/* entry form */
+    s2='<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Enter each forwarder\'s rate as it comes in, then choose the cheapest.</div>'+
+      '<table class="q"><tr><th>Forwarder</th><th>All-in rate (USD)</th><th>Note</th></tr>'+
+      FORWARDERS.map((f,i)=>'<tr><td>'+esc(f.name)+'</td><td><input type="text" id="qp'+i+'" placeholder="e.g. 1095" inputmode="decimal"></td><td><input type="text" id="qn'+i+'" placeholder="free time / cut-off"></td></tr>').join("")+
+      '</table><div class="actbar"><button class="btn primary" id="saveQuotes">Save quotes</button></div>';}
+
+  const docNames={PL:["Packing List (PL)","from the factory / your invoicing team"],CI:["Commercial Invoice (CI)","the export invoice for this shipment"],VGM:["Verified Gross Mass (VGM)","weight declaration for the container"]};
+  let s3;
+  if(st3==="wait"){s3='<div style="font-size:13.5px;color:var(--muted)">Choose a forwarder in step 2 first. Once booked, attach the 3 documents here and send them to the chosen forwarder at stuffing time.</div>';}
+  else{const allDocs=DOC_FILES.PL&&DOC_FILES.CI&&DOC_FILES.VGM;
+    s3='<div style="font-size:12.5px;color:var(--muted);margin-bottom:4px">Sending to <b>'+esc(s.won||"—")+'</b> (the forwarder you chose)</div><div class="docgrid">'+
+      Object.keys(docNames).map(k=>'<div class="docrow"><div class="dn"><b>'+docNames[k][0]+'</b><small>'+(DOC_FILES[k]?esc(DOC_FILES[k].name):docNames[k][1])+'</small></div>'+
+        (DOC_FILES[k]?'<span class="attached">Attached</span>':'')+'<label class="btn sm">'+(DOC_FILES[k]?"Replace":"Attach file")+'<input type="file" data-doc="'+k+'" hidden></label></div>').join("")+
+      '</div><div class="actbar"><button class="btn primary" id="sendDocs" '+(allDocs?"":"disabled")+'>Send documents to forwarder</button>'+
+      (allDocs?'':'<span style="font-size:12px;color:var(--muted-2)">Attach all 3 to enable send</span>')+'<div class="mtoast" id="d-toast"></div></div>';}
+
+  document.getElementById("steps").innerHTML=stepCard(1,"Booking request","Vessel booked and request sent to your forwarders",st1,s1)+
+    stepCard(2,"Quotes & pick","Compare the 3 rates and choose the cheapest",st2,s2)+
+    stepCard(3,"Send documents","Packing List, Commercial Invoice & VGM to the chosen forwarder",st3,s3);
+  wireSteps();
+}
+function quotesTable(s){const nums=s.quotes.map(q=>parseFloat(String(q.price).replace(/[^0-9.]/g,""))).filter(n=>!isNaN(n));const best=nums.length?Math.min.apply(null,nums):null;
+  return '<table class="q"><tr><th>Forwarder</th><th>All-in rate (USD)</th><th>Note</th><th></th></tr>'+
+    s.quotes.map(q=>{const win=s.won===q.fwd;const val=parseFloat(String(q.price).replace(/[^0-9.]/g,""));
+      return '<tr class="'+(win?'win':'')+'"><td>'+esc(q.fwd)+((best!=null&&val===best)?'<span class="best">Lowest</span>':'')+'</td><td class="price">'+esc(q.price)+'</td><td>'+esc(q.note||"")+'</td><td>'+(win?'<b style="color:var(--ok)">✓ Chosen</b>':'<button class="btn sm" data-win="'+esc(q.fwd)+'">Choose</button>')+'</td></tr>';}).join("")+
+    '</table>';}
+function wireSteps(){
+  const sq=document.getElementById("saveQuotes");
+  if(sq)sq.onclick=()=>{const quotes=FORWARDERS.map((f,i)=>({fwd:f.name,price:(document.getElementById("qp"+i).value.trim()),note:(document.getElementById("qn"+i).value.trim())})).filter(q=>q.price);
+    if(!quotes.length){flash("Enter at least one rate.");return;}if(!HAS_GOOGLE){CUR.quotes=quotes;CUR.stage="quotes";renderSteps();return;}
+    srv("saveQuotes",[CUR.ref,quotes],function(){CUR.quotes=quotes;CUR.stage="quotes";renderSteps();flash("Quotes saved — pick the cheapest.");},function(err){flash("Could not save: "+((err&&err.message)?err.message:"error"));});};
+  document.querySelectorAll("[data-win]").forEach(b=>b.onclick=()=>{const name=b.dataset.win;if(!HAS_GOOGLE){CUR.won=name;CUR.stage="booked";renderSteps();return;}
+    srv("chooseForwarder",[CUR.ref,name],function(){CUR.won=name;CUR.stage="booked";renderSteps();flash("Chosen: "+name+". Now attach the documents in step 3.");},function(err){flash("Could not save: "+((err&&err.message)?err.message:"error"));});});
+  document.querySelectorAll('input[type="file"][data-doc]').forEach(inp=>inp.addEventListener("change",e=>{const k=inp.dataset.doc,file=e.target.files[0];if(!file)return;
+    const rd=new FileReader();rd.onload=()=>{DOC_FILES[k]={name:file.name,mimeType:file.type||"application/octet-stream",dataBase64:String(rd.result).split(",")[1]};renderSteps();};rd.readAsDataURL(file);}));
+  const sd=document.getElementById("sendDocs");
+  if(sd)sd.onclick=()=>{const files=["PL","CI","VGM"].map(k=>DOC_FILES[k]).filter(Boolean);if(files.length<3){flash("Attach all 3 documents first.");return;}
+    if(!HAS_GOOGLE){flash("Preview can't send — works on the live web app.");return;}
+    document.getElementById("d-toast").textContent="Sending…";sd.disabled=true;
+    srv("sendDocuments",[CUR.ref,files],function(res){sd.disabled=false;CUR.stage="docs";DOC_FILES.PL=DOC_FILES.CI=DOC_FILES.VGM=null;renderSteps();flash("Documents sent to "+res.to+".");},function(err){sd.disabled=false;document.getElementById("d-toast").textContent="Could not send: "+((err&&err.message)?err.message:"error");});};
+}
+
+/* ============ LOGIN ============ */
+function forceLogout(){AUTH="";try{sessionStorage.removeItem("sf_tok");}catch(e){}
+  document.body.classList.remove("authed");document.getElementById("logoutBtn").hidden=true;
+  document.getElementById("lgPass").value="";document.getElementById("lgErr").textContent="";document.getElementById("lgUser").focus();}
+function onAuthed(){document.body.classList.add("authed");document.getElementById("logoutBtn").hidden=false;
+  srv("getScheduleRows",[],function(rows){buildFromData(rows);render();},function(){});
+  loadForwarders();loadBookings();}
+function doLogin(){var u=document.getElementById("lgUser").value.trim(),p=document.getElementById("lgPass").value,err=document.getElementById("lgErr");
+  if(!u||!p){err.textContent="Enter username and password.";return;}
+  if(!HAS_GOOGLE){err.textContent="Login works on the live web app.";return;}
+  var b=document.getElementById("lgBtn");b.disabled=true;err.textContent="Signing in…";
+  google.script.run.withSuccessHandler(function(res){b.disabled=false;
+    if(res&&res.ok){AUTH=res.token;try{sessionStorage.setItem("sf_tok",AUTH);}catch(e){}err.textContent="";onAuthed();}
+    else{err.textContent="Wrong username or password.";}})
+    .withFailureHandler(function(e){b.disabled=false;err.textContent=(e&&e.message)?e.message:"Could not sign in.";})
+    .login(u,p);}
+document.getElementById("lgBtn").onclick=doLogin;
+document.getElementById("lgPass").addEventListener("keydown",function(e){if(e.key==="Enter")doLogin();});
+document.getElementById("lgUser").addEventListener("keydown",function(e){if(e.key==="Enter")document.getElementById("lgPass").focus();});
+document.getElementById("logoutBtn").onclick=function(){if(HAS_GOOGLE&&AUTH)google.script.run.logout(AUTH);forceLogout();};
+
+/* boot — show the login screen; nothing loads until sign-in succeeds */
+document.getElementById("lgUser").focus();
+</script>
