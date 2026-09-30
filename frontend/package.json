@@ -1,0 +1,21 @@
+{
+  "name": "sailing-finder-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "//": "PROPOSED dependency list. NOTHING IS INSTALLED YET: no npm install has been run and there is no package-lock.json, because the golden rules require APPROVED before adding packages. Reply APPROVED and the install + lockfile land in the same commit as the backend one.",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.5"
+  }
+}

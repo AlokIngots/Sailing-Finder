@@ -1,0 +1,44 @@
+# Sailing Finder — backend dependencies.
+#
+# PROPOSED LIST. NOTHING IS INSTALLED YET — no pip install has been run, per the
+# golden rules. Reply APPROVED (or strike any line) and the install lands with
+# requirements.lock.txt in a single commit.
+#
+# Install, once approved:
+#   cd backend && python -m venv .venv && .venv/bin/pip install -r requirements.txt
+#   .venv/bin/pip freeze > requirements.lock.txt
+
+# --- web ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20          # multipart uploads: PL / CI / VGM
+
+# --- database ---
+# [pool] is the addition to your list: app/db.py uses psycopg_pool for the
+# connection pool, which ships separately from psycopg itself.
+psycopg[binary,pool]==3.2.3
+
+# --- auth / sessions ---
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1                     # pinned <4.1: passlib 1.7.4 logs a version-read
+                                  # error against bcrypt 4.1+. Hashing still works,
+                                  # but the log noise is not worth it.
+itsdangerous==2.2.0               # signs the session cookie
+
+# --- Google Sheet (read-only) ---
+google-api-python-client==2.156.0
+google-auth==2.37.0
+
+# --- jobs ---
+apscheduler==3.11.0
+
+# --- email / PDF / HTTP ---
+aiosmtplib==3.0.2
+reportlab==4.2.5
+httpx==0.28.1                     # addition to your list: the Interakt call needs
+                                  # an async HTTP client; stdlib has none.
+email-validator==2.2.0            # addition to your list: pydantic's EmailStr,
+                                  # used to validate share-by-email recipients.
+
+# --- config ---
+python-dotenv==1.0.1

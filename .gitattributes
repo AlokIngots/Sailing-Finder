@@ -1,0 +1,14 @@
+# Keep LF on files that run on the Linux VPS, whatever the checkout machine does.
+# A CRLF in deploy.sh or an entrypoint means "bad interpreter" at deploy time.
+* text=auto eol=lf
+
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yml       text eol=lf
+*.sql       text eol=lf
+.env.example text eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
