@@ -10,7 +10,6 @@ from dataclasses import dataclass
 
 from fastapi import Depends, HTTPException, Request, status
 
-from app import db
 from app.config import settings
 from app.services import security
 
@@ -21,51 +20,48 @@ class CurrentUser:
     username: str
     name: str
     role: str
+    sid: str
 
     @property
     def is_admin(self) -> bool:
         return self.role == "admin"
 
+    def public(self) -> dict:
+        """What may be sent to the browser. No id, no session id, no hash."""
+        return {"username": self.username, "name": self.name, "role": self.role}
 
-UNAUTHORISED = HTTPException(
-    status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Please sign in.",
-)
+
+def _unauthorised() -> HTTPException:
+    # One message for every failure mode — expired, forged, revoked, absent.
+    # Which one it was is server-side knowledge.
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Please sign in.",
+    )
 
 
 def require_auth(request: Request) -> CurrentUser:
     """Resolve the signed session cookie to a live user, or reject the call."""
     raw = request.cookies.get(settings.session_cookie)
     if not raw:
-        raise UNAUTHORISED
+        raise _unauthorised()
 
     sid = security.unsign_session_id(raw)
     if not sid:
-        raise UNAUTHORISED
+        raise _unauthorised()
 
-    row = db.fetch_one(
-        """
-        SELECT s.sid, u.id, u.username, u.name, u.role
-          FROM sessions s
-          JOIN users u ON u.id = s.user_id
-         WHERE s.sid = %s
-           AND s.expires_at > now()
-           AND u.is_active
-        """,
-        (sid,),
-    )
+    row = security.session_user(sid)
     if not row:
-        raise UNAUTHORISED
+        raise _unauthorised()
 
-    # Sliding expiry: touch the session so an active user is not signed out
-    # mid-task. Cheap enough at our volume.
-    db.execute("UPDATE sessions SET last_seen = now() WHERE sid = %s", (sid,))
+    security.touch_session(sid)
 
     return CurrentUser(
         id=row["id"],
         username=row["username"],
         name=row["name"] or row["username"],
         role=row["role"],
+        sid=sid,
     )
 
 

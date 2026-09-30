@@ -16,7 +16,10 @@ python-multipart==0.0.20          # multipart uploads: PL / CI / VGM
 # --- database ---
 # [pool] is the addition to your list: app/db.py uses psycopg_pool for the
 # connection pool, which ships separately from psycopg itself.
-psycopg[binary,pool]==3.2.3
+# Bumped 3.2.3 -> 3.2.13: psycopg-binary 3.2.3 has no wheel for Python 3.14,
+# which is what a developer laptop here is running. The image is 3.12, where
+# either version works, so the newer pin is the one that suits both.
+psycopg[binary,pool]==3.2.13
 
 # --- auth / sessions ---
 passlib[bcrypt]==1.7.4

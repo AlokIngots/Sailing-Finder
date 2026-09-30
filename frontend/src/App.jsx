@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import api from './api.js';
@@ -10,50 +10,67 @@ import Shipment from './components/Shipment.jsx';
 /**
  * Routes plus the auth gate.
  *
- * Nothing renders until /api/session has answered, so the schedule is never
- * requested — let alone shown — before a successful login. The gate here is a
- * convenience for the user; the real one is require_auth on every /api call.
+ * On load this calls GET /api/me and nothing else. Until that answers with a
+ * user, no other request is made — the schedule is never fetched, let alone
+ * shown, before a successful sign-in.
  *
- * SCAFFOLD: the three views are placeholders until reference/Index.html is
- * supplied. The session handling below is real.
+ * The gate here is for the person using the app. The real one is require_auth
+ * on the server: hiding a view in the browser is not a security boundary.
  */
 export default function App() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [bootError, setBootError] = useState('');
 
   useEffect(() => {
-    let alive = true;
+    const controller = new AbortController();
+
     api
-      .session()
-      .then((data) => alive && setUser(data))
-      .catch(() => alive && setUser(null))
-      .finally(() => alive && setChecking(false));
-    return () => {
-      alive = false;
-    };
+      .me(controller.signal)
+      .then(setUser)
+      .catch((err) => {
+        if (err.name === 'AbortError') return;
+        // 401 is the ordinary "not signed in yet" answer, not a failure worth
+        // showing. Anything else means the server is unreachable or broken,
+        // and saying so beats a login box that silently never works.
+        if (!err.isUnauthorised) setBootError(err.message);
+        setUser(null);
+      })
+      .finally(() => setChecking(false));
+
+    return () => controller.abort();
   }, []);
 
-  async function signOut() {
+  const signOut = useCallback(async () => {
     try {
       await api.logout();
+    } catch {
+      // Already gone server-side, or the network dropped. Either way this
+      // browser is done with the session.
     } finally {
       setUser(null);
     }
-  }
+  }, []);
 
   if (checking) {
-    return <p className="boot">Loading…</p>;
+    return (
+      <p className="boot" role="status">
+        Loading…
+      </p>
+    );
   }
 
   if (!user) {
-    return <Login onSignedIn={setUser} />;
+    return <Login onSignedIn={setUser} serverError={bootError} />;
   }
 
   return (
     <div className="app">
       <header className="app-header">
         <span className="app-title">Sailing Finder</span>
-        <span className="app-user">{user.name}</span>
+        <span className="app-user" title={user.role}>
+          {user.name}
+        </span>
         <button type="button" className="link" onClick={signOut}>
           Sign out
         </button>

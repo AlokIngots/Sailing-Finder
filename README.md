@@ -17,9 +17,10 @@ Two jobs:
 
 ## Status
 
-**Scaffold only.** Structure, database schema, Docker setup, deploy script and
-the rules are in place. No feature code yet — every API route answers `501`
-until its own branch is built and reviewed.
+**Login gate built.** Sign in, sign out, `GET /api/me`, server-side sessions and
+the account script all work and are covered by tests. Everything else — finder,
+enquiry, bookings, shipment, share — still answers `501` until its own branch is
+built and reviewed.
 
 Blocked on three things:
 
@@ -160,11 +161,48 @@ mkdir -p /opt/sailing_finder/secrets  # put google-key.json here (gitignored)
 ./deploy.sh
 ```
 
-Create the first account. The password goes in as an environment variable so it
-does not land in shell history:
+### Accounts
+
+There is **no sign-up page**. Accounts exist only because an admin ran
+`scripts/create_user.py`:
+
+```bash
+docker compose exec -it app python -m scripts.create_user <username> "<Full Name>" [user|admin]
+```
+
+It prompts for the password twice, without echoing it. The role defaults to
+`user`; `admin` sees every booking, `user` sees only their own.
+
+```bash
+# a normal logistics user
+docker compose exec -it app python -m scripts.create_user priya "Priya Sharma"
+
+# an admin
+docker compose exec -it app python -m scripts.create_user alok "Alok" admin
+```
+
+For a setup script or anywhere without a TTY, pass the password through the
+environment instead — **never** as an argument, which would land in shell
+history and be visible in `ps`:
 
 ```bash
 docker compose exec -e SF_NEW_PASSWORD='...' app python -m scripts.create_user alok "Alok" admin
+```
+
+Running it again for an existing username updates that person's name, role and
+password, and signs them out everywhere — a password change should not leave an
+old session alive.
+
+Passwords are bcrypt-hashed before they reach the database; the plain value is
+never stored, logged, or printed. Minimum 8 characters, maximum 72 bytes
+(bcrypt ignores anything past that, so over-long passwords are refused rather
+than silently truncated).
+
+Rollback for an account added by mistake:
+
+```sql
+CREATE TABLE bk_users_20260930 AS SELECT * FROM users;   -- back up first
+DELETE FROM users WHERE username = '<username>';
 ```
 
 ### Day to day
@@ -183,9 +221,10 @@ Python 3.12, Node 22, and a Postgres to point at. Two terminals:
 ```bash
 # backend
 cd backend
-python -m venv .venv && .venv/bin/pip install -r requirements.txt
+python -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 .venv/bin/python -m db.migrate
 .venv/bin/uvicorn app.main:app --reload --port 8000
+.venv/bin/pytest                    # tests need no database
 
 # frontend
 cd frontend
