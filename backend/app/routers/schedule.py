@@ -11,6 +11,7 @@ before attaching it to an email or a PDF — so the rules live here, once.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date
 from typing import Any, Literal
 
@@ -44,14 +45,27 @@ COLUMNS = (
     "service",
 )
 
-#: A transshipment count is only meaningful when it is a whole number.
-#: '0' is direct, '1' or more is indirect, and anything else — blank, or free
-#: text the scrapers could not parse — is unlabelled and appears only under
-#: "All". The same three-way rule is applied in Python by ship_type() below, so
-#: what the filter selects and what the row is tagged as can never disagree.
-_NUMERIC = "btrim(coalesce(transshipment, '')) ~ '^[0-9]+$'"
-_DIRECT_SQL = f"({_NUMERIC} AND btrim(transshipment)::int = 0)"
-_INDIRECT_SQL = f"({_NUMERIC} AND btrim(transshipment)::int >= 1)"
+#: Direct / Indirect, matching reference/Index.html's shipType():
+#:
+#:     var n = parseFloat(s); if (isNaN(n)) return ""; return n === 0 ? "direct" : "indirect";
+#:
+#: parseFloat reads a leading number and ignores whatever follows, so "1 (SIN)"
+#: is one transshipment and "1.5" is a fraction of one — both indirect. Only a
+#: value that does not start with a number at all is unlabelled, and unlabelled
+#: sailings appear solely under "All".
+#:
+#: This regex is that rule: an optional sign, then digits with an optional
+#: fractional part. substring() returns the first parenthesised group, so the
+#: sign is kept. ship_type() below applies the identical rule in Python, so what
+#: the filter selects and what the row is tagged as can never disagree.
+_LEADING_NUMBER_SQL = (
+    r"substring(btrim(coalesce(transshipment, '')) from '^([+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+))')"
+)
+_DIRECT_SQL = f"({_LEADING_NUMBER_SQL} IS NOT NULL AND {_LEADING_NUMBER_SQL}::numeric = 0)"
+_INDIRECT_SQL = f"({_LEADING_NUMBER_SQL} IS NOT NULL AND {_LEADING_NUMBER_SQL}::numeric <> 0)"
+
+#: The Python half of the rule above.
+_LEADING_NUMBER = re.compile(r"^[+-]?(?:\d+\.?\d*|\.\d+)")
 
 SORTS = {
     "etd": "etd ASC NULLS LAST, eta ASC NULLS LAST",              # soonest departure
@@ -61,11 +75,11 @@ SORTS = {
 
 
 def ship_type(transshipment: str | None) -> str:
-    """'direct' | 'indirect' | 'unlabelled' — the Python half of the rule above."""
-    raw = (transshipment or "").strip()
-    if not raw.isdigit():
+    """'direct' | 'indirect' | 'unlabelled', matching the reference's shipType()."""
+    match = _LEADING_NUMBER.match((transshipment or "").strip())
+    if not match:
         return "unlabelled"
-    return "direct" if int(raw) == 0 else "indirect"
+    return "direct" if float(match.group()) == 0 else "indirect"
 
 
 def build_schedule_query(
@@ -117,7 +131,13 @@ def build_schedule_query(
         ("eta", eta_to, "<="),
     ):
         if value is not None:
-            where.append(f"{column} {op} %s")
+            if column == "eta":
+                # The reference skips the arrival test when a sailing has no ETA
+                # (`if(af && r.eta && r.eta < af)`), so a carrier that published
+                # no arrival date is not silently filtered out of the list.
+                where.append(f"(eta IS NULL OR eta {op} %s)")
+            else:
+                where.append(f"etd {op} %s")
             params.append(value)
 
     if routing == "direct":
@@ -130,15 +150,17 @@ def build_schedule_query(
     where_sql = " AND ".join(where)
 
     if mode == "next_per_port":
-        # One row per destination: the soonest departure to each port. The inner
-        # ORDER BY is what DISTINCT ON picks by, so it is fixed; the user's sort
-        # is applied to the result.
+        # The soonest departure to each port BY EACH CARRIER — the reference
+        # keys on `r.pod_code + "|" + r.carrier`, not the port alone, so a
+        # customer still sees every line that serves the port, just once each.
+        # The inner ORDER BY is what DISTINCT ON picks by, so it is fixed; the
+        # user's sort is applied to the result.
         sql = (
             f"SELECT * FROM ("
-            f"  SELECT DISTINCT ON (pod_code) {columns}"
+            f"  SELECT DISTINCT ON (pod_code, carrier) {columns}"
             f"    FROM schedule"
             f"   WHERE {where_sql}"
-            f"   ORDER BY pod_code, etd ASC NULLS LAST, eta ASC NULLS LAST"
+            f"   ORDER BY pod_code, carrier, etd ASC NULLS LAST, eta ASC NULLS LAST"
             f") next_per_port"
             f" ORDER BY {order_by}"
             f" LIMIT %s"

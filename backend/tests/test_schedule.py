@@ -94,6 +94,13 @@ def test_both_date_ranges_are_applied():
     assert params[:4] == [date(2026, 10, 1), date(2026, 10, 31), date(2026, 11, 1), date(2026, 11, 30)]
 
 
+def test_a_sailing_with_no_eta_survives_an_arrival_filter():
+    """The reference skips the arrival test when a sailing has no ETA, so a
+    carrier that published no arrival date is not quietly dropped."""
+    where = where_for(eta_from=date(2026, 11, 1))
+    assert "eta IS NULL OR eta >= %s" in where
+
+
 # ---------------------------------------------------------------------------
 # Direct / Indirect
 # ---------------------------------------------------------------------------
@@ -104,12 +111,12 @@ def test_all_routing_filters_nothing():
 
 def test_direct_selects_zero_transshipments():
     where = where_for(routing="direct")
-    assert "btrim(transshipment)::int = 0" in where
-    assert "~ '^[0-9]+$'" in where
+    assert "::numeric = 0" in where
+    assert "substring(btrim(coalesce(transshipment" in where
 
 
-def test_indirect_selects_one_or_more():
-    assert "btrim(transshipment)::int >= 1" in where_for(routing="indirect")
+def test_indirect_selects_a_non_zero_count():
+    assert "::numeric <> 0" in where_for(routing="indirect")
 
 
 @pytest.mark.parametrize(
@@ -117,20 +124,26 @@ def test_indirect_selects_one_or_more():
     [
         ("0", "direct"),
         (" 0 ", "direct"),
+        ("0.0", "direct"),
         ("1", "indirect"),
         ("2", "indirect"),
+        # parseFloat reads a leading number and ignores the rest, so a labelled
+        # transshipment port still counts as one leg.
+        ("1 (SIN)", "indirect"),
+        ("1.5", "indirect"),
         ("", "unlabelled"),
         (None, "unlabelled"),
         ("   ", "unlabelled"),
         ("direct", "unlabelled"),
-        ("1 (SIN)", "unlabelled"),
+        ("transshipment", "unlabelled"),
     ],
 )
-def test_ship_type_matches_the_sql_rule(value, expected):
-    """The tag on a row and the filter that selected it must agree.
+def test_ship_type_matches_the_reference(value, expected):
+    """Ported from reference/Index.html's shipType().
 
-    Both sides require a plain whole number: the SQL with ~ '^[0-9]+$', this
-    with str.isdigit(). Anything else is unlabelled on both sides.
+    The tag on a row and the filter that selected it must agree, so the SQL and
+    this function implement the same parseFloat rule: a leading number decides
+    it, and only a value with no leading number at all is unlabelled.
     """
     assert ship_type(value) == expected
 
@@ -142,11 +155,13 @@ def test_all_sailings_is_a_plain_select():
     assert "DISTINCT ON" not in sql_for(mode="all")
 
 
-def test_next_per_port_takes_one_row_per_destination():
+def test_next_per_port_takes_one_row_per_port_and_carrier():
+    """The reference keys on pod_code|carrier, not the port alone — a customer
+    still sees every line that serves the port, just once each."""
     sql = sql_for(mode="next_per_port")
-    assert "DISTINCT ON (pod_code)" in sql
-    # The soonest departure to each port, then the user's sort on top.
-    assert "ORDER BY pod_code, etd ASC NULLS LAST" in sql
+    assert "DISTINCT ON (pod_code, carrier)" in sql
+    # The soonest departure per pair, then the user's sort on top.
+    assert "ORDER BY pod_code, carrier, etd ASC NULLS LAST" in sql
 
 
 @pytest.mark.parametrize(

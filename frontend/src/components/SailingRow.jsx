@@ -1,46 +1,61 @@
-import { destination, formatDate, formatTransit, isLeavingSoon, shipTypeLabel } from '../lib/format.js';
+import { fmtShort, isLeavingSoon, shipTypeLabel, tidy } from '../lib/format.js';
 
 /**
- * One sailing in the finder list.
+ * One sailing — a straight port of the reference's `.sail` block.
  *
- * Reads as a card on a phone and as a row on a desktop — same markup, the grid
- * in app.css does the rest.
+ * The vessel name is the heading and the carrier is a tag beside it, which is
+ * the reference's ordering, not ours. Dates are short ("5 Oct"): the year is
+ * noise on a list that only ever holds today and the next few weeks.
  *
- * The Direct/Indirect tag comes from the server's ship_type; an unlabelled
- * sailing gets no tag rather than a guess.
+ * `.right` collapses under 600px via the reference's media query — same markup,
+ * no separate mobile layout.
  */
-export default function SailingRow({ sailing }) {
+export default function SailingRow({ sailing, onEnquire }) {
+  const { vessel, voyage } = tidy(sailing);
   const routing = shipTypeLabel(sailing.ship_type);
   const soon = isLeavingSoon(sailing.etd);
 
   return (
-    <li className="sailing">
-      <div className="sailing-carrier">
-        <span className="carrier-name">{sailing.carrier}</span>
-        {sailing.voyage_no ? <span className="voyage">{sailing.voyage_no}</span> : null}
-        {routing ? (
-          <span className={`tag tag-${sailing.ship_type}`}>{routing}</span>
-        ) : null}
+    <div className="sail">
+      <div className="left">
+        <div className="vessel">{vessel}</div>
+        <div className="sub">
+          <span className="tag">{sailing.carrier}</span>
+          {voyage ? <span>{voyage}</span> : null}
+          {routing ? <span className={`ttag ${sailing.ship_type}`}>{routing}</span> : null}
+          <span className="dest">
+            to {sailing.pod_name || sailing.pod_code}, {sailing.country}
+          </span>
+          {soon ? (
+            <span className="soon">
+              <i />
+              Leaving soon
+            </span>
+          ) : null}
+        </div>
       </div>
 
-      <div className="sailing-dest">
-        <span className="dest-port">{destination(sailing)}</span>
-        {sailing.vessel_name ? <span className="vessel">{sailing.vessel_name}</span> : null}
+      <div className="right">
+        <div className="dt">
+          <div className="k">Departs</div>
+          <div className="v">{fmtShort(sailing.etd)}</div>
+        </div>
+        <div className="dt">
+          <div className="k">Arrives</div>
+          <div className="v">{fmtShort(sailing.eta)}</div>
+          {sailing.transit_days != null ? (
+            <div className="transit">{sailing.transit_days} days transit</div>
+          ) : null}
+        </div>
       </div>
 
-      <div className="sailing-when">
-        <span className="when">
-          <span className="when-label">ETD</span>
-          <span className="when-value">{formatDate(sailing.etd)}</span>
-          {soon ? <span className="badge-soon">Leaving soon</span> : null}
-        </span>
-        <span className="when">
-          <span className="when-label">ETA</span>
-          <span className="when-value">{formatDate(sailing.eta)}</span>
-        </span>
-      </div>
-
-      <div className="sailing-transit">{formatTransit(sailing.transit_days)}</div>
-    </li>
+      <button
+        type="button"
+        className="btn primary bookbtn internal"
+        onClick={() => onEnquire(sailing)}
+      >
+        Enquire
+      </button>
+    </div>
   );
 }
