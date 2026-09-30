@@ -1,14 +1,16 @@
 /*
   Sailing Finder — styles.
 
-  PLACEHOLDER. The real stylesheet is ported as-is from reference/Index.html,
-  which has not been supplied yet, so no layout has been invented here. What
-  follows is only the brand foundation and enough to make the scaffold and the
-  login screen legible.
+  The finder / bookings / shipment styles are ported from reference/Index.html,
+  which has not been supplied yet. What is here is the brand foundation, the app
+  shell, and the login screen — the only part of the UI that is new work rather
+  than a port, so it has nothing to match against.
 
-  Light theme only. No dark mode, and no prefers-color-scheme override — the
-  app looks the same on every machine, which is what customers see over a
-  shoulder.
+  Light theme only. No dark mode and no prefers-color-scheme override: the app
+  looks the same on every machine, which matters when a customer is reading it
+  over someone's shoulder.
+
+  Mobile-first. Everything below is written for ~400px and widened at 720px.
 */
 
 :root {
@@ -21,8 +23,9 @@
 
   --ink: var(--navy);
   --muted: #5a6275;
-  --line: #dfe3ea;
-  --tint: #f5f7fa;
+  --line: #d8dde6;
+  --tint: #f4f6f9;
+  --focus: #1b3a7a;
 
   --radius: 8px;
   --gap: 12px;
@@ -40,32 +43,44 @@ body {
 
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 15px;
+  font-size: 16px;            /* 16px stops iOS zooming on input focus */
   line-height: 1.45;
   color: var(--ink);
   background: var(--paper);
   -webkit-text-size-adjust: 100%;
 }
 
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* --- controls ----------------------------------------------------------- */
+
 button {
   font: inherit;
   cursor: pointer;
-  padding: 10px 16px;
   min-height: 44px;            /* comfortable tap target on a phone */
+  padding: 10px 16px;
   border: 1px solid var(--navy);
   border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--navy);
+}
+
+button.primary {
   background: var(--navy);
   color: var(--paper);
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 button.link {
   min-height: auto;
-  padding: 4px 8px;
+  padding: 6px 8px;
   border: 0;
   background: none;
   color: var(--navy);
@@ -77,16 +92,41 @@ select {
   font: inherit;
   width: 100%;
   min-height: 44px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--paper);
   color: var(--ink);
 }
 
+input:disabled {
+  background: var(--tint);
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.field label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Red is a signal, not decoration — it appears here and nowhere else. */
 .error {
   margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--red);
+  border-radius: var(--radius);
+  background: #fdf3f3;
   color: var(--red);
+  font-size: 14px;
+}
+
+.error:focus {
+  outline: 2px solid var(--red);
+  outline-offset: 2px;
 }
 
 .boot {
@@ -113,6 +153,12 @@ select {
 .app-user {
   margin-left: auto;
   color: var(--muted);
+  font-size: 14px;
+  /* A long name must not push Sign out off a narrow screen. */
+  max-width: 45vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* --- login -------------------------------------------------------------- */
@@ -121,17 +167,18 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;          /* avoids the mobile address-bar jump */
   padding: 16px;
   background: var(--tint);
 }
 
 .login-card {
   display: grid;
-  gap: 8px;
+  gap: 14px;
   width: 100%;
-  max-width: 360px;
-  padding: 24px;
+  max-width: 380px;
+  padding: 24px 20px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--paper);
@@ -140,30 +187,43 @@ select {
 .login-title {
   margin: 0;
   font-size: 22px;
+  line-height: 1.2;
   color: var(--navy);
 }
 
 .login-sub {
-  margin: 0 0 8px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.login-card label {
+  margin: -10px 0 2px;
   font-size: 13px;
   color: var(--muted);
 }
 
 .login-card button {
-  margin-top: 8px;
+  margin-top: 2px;
 }
 
-/* --- responsive --------------------------------------------------------- */
-/* Mobile-first above; this is the desktop widening. Everything must stay
-   usable at ~400px, which is the width the team actually checks on. */
+.login-foot {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* --- desktop ------------------------------------------------------------ */
 
 @media (min-width: 720px) {
   .app-header {
     padding: 14px 24px;
+  }
+
+  .app-user {
+    max-width: none;
+  }
+
+  .login-card {
+    padding: 32px 28px;
+  }
+
+  .login-title {
+    font-size: 26px;
   }
 }

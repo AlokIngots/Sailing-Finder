@@ -1,0 +1,10 @@
+# Test-only dependencies. Not installed in the production image.
+#
+#   pip install -r requirements.txt -r requirements-dev.txt
+#
+# httpx is already a runtime dependency (the Interakt call) and is what
+# fastapi.testclient runs on, so it is not repeated here.
+
+-r requirements.txt
+
+pytest==8.3.4

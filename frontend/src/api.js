@@ -1,8 +1,8 @@
 /**
  * The single place the app talks to the backend.
  *
- * Every response uses the envelope { status, data, message }. A 401 means the
- * session has gone — the caller is told, and App.jsx drops back to the login
+ * Every response uses the envelope { status, data, message }. A 401 means there
+ * is no live session — the caller is told, and App.jsx drops back to the login
  * screen rather than showing an empty list that looks like "no results".
  */
 
@@ -21,13 +21,23 @@ export class ApiError extends Error {
 async function request(path, { method = 'GET', body, signal } = {}) {
   const isForm = body instanceof FormData;
 
-  const response = await fetch(`/api${path}`, {
-    method,
-    signal,
-    credentials: 'same-origin',
-    headers: isForm || body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: isForm ? body : body === undefined ? undefined : JSON.stringify(body),
-  });
+  let response;
+  try {
+    response = await fetch(`/api${path}`, {
+      method,
+      signal,
+      // The session cookie must ride along on every call, including the very
+      // first /me check.
+      credentials: 'include',
+      headers: isForm || body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      body: isForm ? body : body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (cause) {
+    // Network down, server not running, request aborted. Distinct from "the
+    // server answered and said no" — the user sees a different message.
+    if (cause.name === 'AbortError') throw cause;
+    throw new ApiError('Cannot reach the server. Check your connection.', 0);
+  }
 
   let payload = null;
   try {
@@ -45,10 +55,12 @@ async function request(path, { method = 'GET', body, signal } = {}) {
 }
 
 export const api = {
-  session: () => request('/session'),
+  // --- auth ---
+  me: (signal) => request('/me', { signal }),
   login: (username, password) => request('/login', { method: 'POST', body: { username, password } }),
   logout: () => request('/logout', { method: 'POST' }),
 
+  // --- everything below arrives with its own feature branch ---
   schedule: (filters, signal) => request(`/schedule?${new URLSearchParams(filters)}`, { signal }),
   forwarders: () => request('/forwarders'),
 
