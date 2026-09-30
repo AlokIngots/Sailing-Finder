@@ -1,0 +1,33 @@
+<!doctype html>
+<!--
+  PLACEHOLDER — not the real UI.
+
+  The real index.html is produced by splitting reference/Index.html into:
+    frontend/index.html   (markup, plus the new login screen)
+    frontend/css/styles.css
+    frontend/js/app.js
+
+  reference/Index.html has not been supplied yet, so nothing has been invented
+  here. See reference/README.md.
+
+  When it is split, the ONLY changes to the markup and styles are:
+    1. add the sign-in screen (navy/white, light theme, matching the app)
+    2. replace google.script.run.* with fetch('/api/...')
+    3. remove the <?!= rows ?> injection — the schedule is fetched after login,
+       never embedded in the page
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sailing Finder — Alok Ingots (Mumbai) Pvt. Ltd.</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <noscript>Sailing Finder needs JavaScript switched on.</noscript>
+    <main id="app" data-state="placeholder">
+      <p>Scaffold only — the UI is added once <code>reference/Index.html</code> is supplied.</p>
+    </main>
+    <script src="/js/app.js"></script>
+  </body>
+</html>

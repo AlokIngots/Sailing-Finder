@@ -1,0 +1,23 @@
+/*
+  PLACEHOLDER — the real stylesheet is lifted verbatim from reference/Index.html,
+  which has not been supplied yet. Nothing has been invented here.
+
+  Brand, for when it is: light theme only, no dark mode.
+*/
+:root {
+  --navy: #000c2e;   /* primary */
+  --red: #bc0300;    /* signal only — errors, urgency */
+  --orange: #e5531a; /* logo mark only */
+  --paper: #ffffff;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--navy);
+  background: var(--paper);
+}
+
+#app {
+  padding: 24px;
+}

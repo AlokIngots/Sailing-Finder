@@ -1,0 +1,43 @@
+# --- secrets: never commit ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+secrets/
+google-service-account*.json
+*-service-account.json
+
+# --- dependencies / build output ---
+node_modules/
+dist/
+build/
+.cache/
+
+# --- backups (kept outside the repo; this is belt-and-braces) ---
+*.bak
+*.bak.*
+backups/
+*.dump
+*.sql.gz
+
+# --- customer data / uploads ---
+uploads/
+*.xlsx
+*.xls
+*.csv
+*.pdf
+
+# --- logs & runtime ---
+*.log
+npm-debug.log*
+pids/
+*.pid
+
+# --- editor / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
