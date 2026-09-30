@@ -17,22 +17,25 @@ Two jobs:
 
 ## Status
 
-**Login gate built.** Sign in, sign out, `GET /api/me`, server-side sessions and
-the account script all work and are covered by tests. Everything else — finder,
-enquiry, bookings, shipment, share — still answers `501` until its own branch is
-built and reviewed.
+**Login gate and finder built.** Sign in, sign out, `GET /api/me`, server-side
+sessions, the account script, the schedule sync and the finder screen all work
+and are covered by tests. Enquiry, bookings, shipment and the two share
+endpoints still answer `501` until their own branches.
 
 Blocked on three things:
 
 - **`reference/Index.html` and `reference/Code.gs` are still missing.** They are
-  the source of truth for look and behaviour. Nothing has been invented in their
-  absence: the React components are labelled placeholders and `app.css` holds
-  only the brand foundation. See `reference/README.md`.
-- **Dependencies are not installed.** `backend/requirements.txt` and
-  `frontend/package.json` list what is proposed; no `pip install`, no
-  `npm install`, no lockfiles, pending **APPROVED**.
+  meant to be the source of truth for look and behaviour. The finder has
+  therefore been built to the **written** specification, not ported from the
+  reference — every control it asks for is present and behaves as described, but
+  the layout and styling are not a copy of the Apps Script screen, because
+  there is nothing to copy. Expect to reconcile the visuals when the files turn
+  up. See `reference/README.md`.
 - **VPS details.** Which reverse proxy is in front (Nginx / Caddy / Traefik) and
   its Docker network name. Marked `TODO(vps)` in `docker-compose.yml`.
+- **Nothing has run against a real Postgres.** There is no database on a
+  developer machine here, so the SQL is unverified even though the logic that
+  builds it is tested.
 
 ---
 
@@ -213,6 +216,22 @@ docker compose exec app python -m db.migrate        # apply schema (safe to re-r
 docker compose exec app python -m jobs.daily        # sync + cleanup, now
 docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
 ```
+
+### Sample data
+
+`services/sheet_sync.py` needs a Google service-account key, which only exists
+on the VPS. To get a usable schedule anywhere else:
+
+```bash
+python -m scripts.seed_sample              # ~180 made-up sailings over 8 weeks
+python -m scripts.seed_sample --count 400
+python -m scripts.seed_sample --clear      # remove them again
+```
+
+Everything it writes carries `source = 'sample-seed'`, and `--clear` only ever
+deletes rows with that marker — so it cannot remove real sailings. The data is
+generated from a fixed seed: plausible, repeatable, and entirely invented. No
+customer, rate or booking data appears in it.
 
 ### Locally
 

@@ -208,6 +208,235 @@ input:disabled {
   text-align: center;
 }
 
+/* --- finder ------------------------------------------------------------- */
+
+.finder {
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+/* Mobile: one filter per row. Widened on desktop below. */
+.filters {
+  display: grid;
+  gap: 12px;
+}
+
+.range {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.range legend {
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.range-sep {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+/* Segmented control: one bordered group, dividers between the options. */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--navy);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.seg {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-left: 1px solid var(--navy);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--navy);
+  white-space: nowrap;
+}
+
+.seg:first-child {
+  border-left: 0;
+}
+
+.seg.on {
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.sort {
+  min-width: 190px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.actions button {
+  flex: 1 1 auto;
+  min-width: 120px;
+}
+
+.customer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.customer-toggle input {
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+}
+
+/* Customer view: internal-only tools come off the screen entirely. */
+.internal.hidden {
+  display: none;
+}
+
+.notice {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--tint);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.result-count {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.empty {
+  margin: 0;
+  padding: 24px 16px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  text-align: center;
+  color: var(--muted);
+}
+
+/* --- the list ----------------------------------------------------------- */
+
+.sailings {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Mobile: each sailing is a card. Desktop turns it into a row below. */
+.sailing {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.sailing-carrier {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.carrier-name {
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.voyage {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.tag {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tag-direct {
+  border-color: var(--navy);
+  color: var(--navy);
+}
+
+.dest-port {
+  display: block;
+  font-weight: 600;
+}
+
+.vessel {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sailing-when {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+}
+
+.when {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.when-label {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+/* Red is a signal, and a ship leaving inside three days is the signal. */
+.badge-soon {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--red);
+  color: var(--paper);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sailing-transit {
+  font-size: 14px;
+  color: var(--muted);
+}
+
 /* --- desktop ------------------------------------------------------------ */
 
 @media (min-width: 720px) {
@@ -225,5 +454,36 @@ input:disabled {
 
   .login-title {
     font-size: 26px;
+  }
+
+  .finder {
+    padding: 20px 24px;
+  }
+
+  .filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
+  }
+
+  .actions button {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  /* Card becomes a row: carrier | destination | dates | transit. */
+  .sailing {
+    grid-template-columns: minmax(170px, 1fr) minmax(190px, 1.3fr) minmax(260px, 1.4fr) 90px;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .sailing-transit {
+    text-align: right;
+  }
+}
+
+@media (min-width: 1100px) {
+  .filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) repeat(2, minmax(0, 1.2fr));
   }
 }

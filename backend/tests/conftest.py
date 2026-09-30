@@ -40,6 +40,12 @@ class FakeDb:
         self.users: dict[str, dict] = {}
         self.sessions: dict[str, dict] = {}
         self._next_id = 1
+        #: Canned result for fetch_all, plus a record of what was asked for.
+        #: The schedule endpoint builds its SQL in build_schedule_query, which
+        #: is tested directly; here we only care that the endpoint passes the
+        #: rows through and shapes them.
+        self.rows: list[dict] = []
+        self.queries: list[tuple[str, object]] = []
 
     # --- helpers used by tests ---
     def add_user(self, username, password_hash, name="", role="user", is_active=True) -> dict:
@@ -90,6 +96,10 @@ class FakeDb:
 
         raise AssertionError(f"FakeDb got an unexpected query: {sql.strip()[:80]}")
 
+    def fetch_all(self, sql: str, params=()):
+        self.queries.append((sql, params))
+        return list(self.rows)
+
     def execute(self, sql: str, params=()) -> int:
         if "INSERT INTO sessions" in sql:
             sid, user_id, expires_at, user_agent, ip = params
@@ -133,7 +143,7 @@ def fake_db(monkeypatch) -> FakeDb:
     from app import db
 
     fake = FakeDb()
-    for name in ("fetch_one", "execute", "open_pool", "close_pool"):
+    for name in ("fetch_one", "fetch_all", "execute", "open_pool", "close_pool"):
         monkeypatch.setattr(db, name, getattr(fake, name))
     return fake
 
