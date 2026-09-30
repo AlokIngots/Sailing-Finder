@@ -54,14 +54,28 @@ async function request(path, { method = 'GET', body, signal } = {}) {
   return payload.data;
 }
 
+/** Drop empty values so the server sees an absent filter, not a blank one. */
+function queryString(params) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params || {})) {
+    if (value !== undefined && value !== null && value !== '') search.set(key, value);
+  }
+  const query = search.toString();
+  return query ? `?${query}` : '';
+}
+
 export const api = {
   // --- auth ---
   me: (signal) => request('/me', { signal }),
   login: (username, password) => request('/login', { method: 'POST', body: { username, password } }),
   logout: () => request('/logout', { method: 'POST' }),
 
+  // --- finder ---
+  schedule: (filters, signal) => request(`/schedule${queryString(filters)}`, { signal }),
+  scheduleFilters: (country, signal) =>
+    request(`/schedule/filters${queryString({ country })}`, { signal }),
+
   // --- everything below arrives with its own feature branch ---
-  schedule: (filters, signal) => request(`/schedule?${new URLSearchParams(filters)}`, { signal }),
   forwarders: () => request('/forwarders'),
 
   bookings: () => request('/bookings'),

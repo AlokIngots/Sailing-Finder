@@ -1,32 +1,32 @@
 /**
- * Small helpers shared by the finder and the bookings views.
+ * Display helpers for the finder and the bookings views.
  *
- * These implement the rules stated in the build spec. Anything that depends on
- * the exact wording or markup of reference/Index.html is NOT here yet — that
- * file has not been supplied, so nothing has been guessed.
+ * Direct / Indirect is NOT decided here. The server sends `ship_type` on every
+ * sailing, worked out from the same rule the routing filter uses in SQL, so the
+ * tag on a row and the filter that selected it can never disagree.
  */
 
 /** ETD within this many days earns the "Leaving soon" badge. */
 export const LEAVING_SOON_DAYS = 3;
 
 /**
- * Direct / Indirect, from the sheet's `transshipment` column.
- *   '0'      -> direct
- *   '1', '2' -> indirect
- *   blank    -> unlabelled; shown only under the "All" toggle, never tagged
+ * Parse a plain 'YYYY-MM-DD' as a LOCAL date.
+ *
+ * `new Date('2026-09-29')` is parsed as UTC midnight, which in a negative-offset
+ * timezone prints as the 28th. Sailing dates have no time and no zone — a
+ * departure on the 29th is the 29th wherever you read it.
  */
-export function shipType(transshipment) {
-  const raw = String(transshipment ?? '').trim();
-  if (raw === '') return 'unlabelled';
-  const n = Number.parseInt(raw, 10);
-  if (Number.isNaN(n)) return 'unlabelled';
-  return n === 0 ? 'direct' : 'indirect';
-}
+export function parseDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
 
-/** Does a sailing belong in the current All / Direct / Indirect toggle? */
-export function matchesRouting(transshipment, routing) {
-  if (routing === 'all') return true;
-  return shipType(transshipment) === routing;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+  if (iso) {
+    return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 /** Midnight today, local time — the reference point for "leaving soon". */
@@ -36,16 +36,15 @@ function startOfToday() {
   return d;
 }
 
-/** Whole days from today to `date`. Negative means it has already gone. */
-export function daysUntil(date) {
-  if (!date) return null;
-  const then = new Date(date);
-  if (Number.isNaN(then.getTime())) return null;
+/** Whole days from today to `value`. Negative means it has already gone. */
+export function daysUntil(value) {
+  const then = parseDate(value);
+  if (!then) return null;
   then.setHours(0, 0, 0, 0);
   return Math.round((then - startOfToday()) / 86_400_000);
 }
 
-/** "Leaving soon" — departing within the next LEAVING_SOON_DAYS days. */
+/** Departing within the next LEAVING_SOON_DAYS days (today counts). */
 export function isLeavingSoon(etd) {
   const days = daysUntil(etd);
   return days !== null && days >= 0 && days <= LEAVING_SOON_DAYS;
@@ -53,8 +52,25 @@ export function isLeavingSoon(etd) {
 
 /** Dates read the way the team writes them: 29 Sep 2026. */
 export function formatDate(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
+  const d = parseDate(value);
+  if (!d) return '';
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** 'Direct' / 'Indirect' / '' for display, from the server's ship_type. */
+export function shipTypeLabel(shipType) {
+  if (shipType === 'direct') return 'Direct';
+  if (shipType === 'indirect') return 'Indirect';
+  return '';
+}
+
+/** "37 days", or an em dash when the carrier did not publish one. */
+export function formatTransit(days) {
+  return Number.isFinite(days) ? `${days} days` : '—';
+}
+
+/** Destination as the team says it: "Rotterdam, Netherlands". */
+export function destination(sailing) {
+  const port = sailing.pod_name || sailing.pod_code || '';
+  return sailing.country ? `${port}, ${sailing.country}` : port;
 }

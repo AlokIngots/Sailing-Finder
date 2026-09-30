@@ -138,15 +138,16 @@ def test_me_is_200_when_signed_in(client, alok):
 
 
 def test_other_endpoints_are_gated_too(client, alok):
-    """The gate is mounted per-router, so check one that is not /api/me.
+    """The gate is mounted per-router, so check ones that are not /api/me.
 
-    /api/schedule is still a stub, so signed in it answers 501 — which is the
+    /api/bookings is still a stub, so signed in it answers 501 — which is the
     point: the request got past require_auth and died in the handler instead.
     """
+    assert client.get("/api/bookings").status_code == 401
     assert client.get("/api/schedule").status_code == 401
 
     sign_in(client, "alok")
-    assert client.get("/api/schedule").status_code == 501
+    assert client.get("/api/bookings").status_code == 501
 
 
 def test_a_forged_cookie_is_rejected(client, alok):
