@@ -1,0 +1,33 @@
+{
+  "name": "sailing-finder-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sailing Finder — Express API + static frontend for Alok Ingots (Mumbai) Pvt. Ltd.",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "migrate": "node src/db/migrate.js",
+    "sync": "node jobs/daily.js",
+    "create-user": "node scripts/create-user.js",
+    "test": "node --test test/"
+  },
+  "//": "PROPOSED dependency list — matches the stack named in the build spec. NOTHING IS INSTALLED YET: no npm install has been run and there is no package-lock.json, because the golden rules require APPROVED before adding packages. Reply APPROVED (or strike any line) and the install + lockfile land in the same commit.",
+  "dependencies": {
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "connect-pg-simple": "^10.0.0",
+    "pg": "^8.13.1",
+    "bcrypt": "^5.1.1",
+    "nodemailer": "^6.9.16",
+    "googleapis": "^144.0.0",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "pdfkit": "^0.15.2",
+    "helmet": "^8.0.0"
+  },
+  "devDependencies": {}
+}
