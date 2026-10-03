@@ -93,7 +93,7 @@ class Settings:
 
     # --- WhatsApp (Interakt) ---
     interakt_api_key: str = _optional("INTERAKT_API_KEY")
-    interakt_template: str = _optional("INTERAKT_TEMPLATE_NAME")
+    interakt_template: str = _optional("INTERAKT_TEMPLATE_NAME", "sailing_schedule")
     interakt_lang: str = _optional("INTERAKT_TEMPLATE_LANG", "en")
     interakt_country: str = _optional("INTERAKT_COUNTRY_CODE", "91")
 

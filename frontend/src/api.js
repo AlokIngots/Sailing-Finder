@@ -83,12 +83,14 @@ export const api = {
   // --- everything below arrives with its own feature branch ---
   forwarders: () => request('/forwarders'),
 
-  bookings: () => request('/bookings'),
+  bookings: (signal) => request('/bookings', { signal }),
   enquiry: (payload) => request('/enquiry', { method: 'POST', body: payload }),
   saveQuotes: (ref, quotes) => request(`/bookings/${encodeURIComponent(ref)}/quotes`, { method: 'POST', body: { quotes } }),
   chooseForwarder: (ref, forwarderId) => request(`/bookings/${encodeURIComponent(ref)}/choose`, { method: 'POST', body: { forwarder_id: forwarderId } }),
   sendDocuments: (ref, formData) => request(`/bookings/${encodeURIComponent(ref)}/documents`, { method: 'POST', body: formData }),
 
+  /** The PDF the shares attach, for the current filters — a link to open, not a fetch. */
+  sharePdfUrl: (filters) => `/api/share/pdf${queryString(filters)}`,
   shareEmail: (payload) => request('/share/email', { method: 'POST', body: payload }),
   shareWhatsApp: (payload) => request('/share/whatsapp', { method: 'POST', body: payload }),
 

@@ -1,28 +1,43 @@
-"""Sharing the filtered sailing list: email and WhatsApp.
+"""Sharing the filtered sailing list: email and WhatsApp, both carrying the
+schedule PDF — sendMail() and sendWhatsAppPdf() in reference/Code.gs.
 
-Copy-list and CSV download happen in the browser from data it already has, so
-they need no endpoint. The PDF is built server-side by services/pdf.py.
+The browser sends its filter state, never rows: the server rebuilds exactly
+the list on screen with the same query the finder uses (routers/schedule.py),
+so what is sent cannot be edited on the way.
 
-SCAFFOLD: handlers are stubs. Built on feature/share.
+Copy list and CSV download happen in the browser from data it already has, so
+they need no endpoint.
+
+GET /api/share/pdf draws the same PDF without sending it — a preview that works
+before any SMTP or Interakt key exists.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
+import logging
+from datetime import date
+from typing import Annotated, Literal
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from app import db
 from app.deps import CurrentUser, require_auth
+from app.routers.schedule import build_schedule_query, shape
+from app.services import mailer, pdf, share_text, shared_pdfs, wa_contacts, whatsapp
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 
+#: Served outside /api, with no session: the link Interakt downloads the PDF
+#: from. See services/shared_pdfs.py.
+public_router = APIRouter()
+
 MAX_RECIPIENTS = 20  # bulk sends are bounded
 
-
-def _not_built(name: str) -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail=f"{name} is not built yet.",
-    )
+NOTHING_TO_SEND = "No sailings to send — adjust the filters."
 
 
 class Filters(BaseModel):
@@ -32,13 +47,19 @@ class Filters(BaseModel):
     country: str | None = None
     pod_code: str | None = None
     carrier: str | None = None
-    etd_from: str | None = None
-    etd_to: str | None = None
-    eta_from: str | None = None
-    eta_to: str | None = None
-    routing: str = "all"
-    mode: str = "all"
-    sort: str = "etd"
+    etd_from: date | None = None
+    etd_to: date | None = None
+    eta_from: date | None = None
+    eta_to: date | None = None
+    routing: Literal["all", "direct", "indirect"] = "all"
+    mode: Literal["all", "next_per_port"] = "all"
+    sort: Literal["etd", "transit", "eta"] = "etd"
+
+    @field_validator("etd_from", "etd_to", "eta_from", "eta_to", mode="before")
+    @classmethod
+    def _blank_date(cls, value):
+        # The finder sends '' for an empty date box.
+        return None if value in ("", None) else value
 
 
 class EmailIn(BaseModel):
@@ -55,13 +76,119 @@ class WhatsAppIn(BaseModel):
     filters: Filters
 
 
+def _rows(filters: Filters) -> list[dict]:
+    sql, params = build_schedule_query(**filters.model_dump())
+    return [shape(r) for r in db.fetch_all(sql, params)]
+
+
+def _render(filters: Filters) -> tuple[list[dict], str, bytes, str]:
+    """(rows, where, pdf bytes, file name) for the current filters."""
+    rows = _rows(filters)
+    where = share_text.where_label(filters, rows)
+    when = share_text.now_local()
+    meta = {
+        "line": share_text.summary_line(where, len(rows)),
+        "generated": share_text.generated_stamp(when),
+    }
+    return rows, where, pdf.build_schedule_pdf(rows, meta), share_text.pdf_filename(when)
+
+
+@router.get("/share/pdf")
+def preview_pdf(filters: Annotated[Filters, Query()], user: CurrentUser = Depends(require_auth)) -> Response:
+    """The PDF for the current filters, shown in the browser. Sends nothing."""
+    _, _, data, filename = _render(filters)
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 @router.post("/share/email")
-def share_email(body: EmailIn, user: CurrentUser = Depends(require_auth)):
-    """The filtered list as an email, with the schedule PDF attached."""
-    raise _not_built("Email these")
+async def share_email(body: EmailIn, user: CurrentUser = Depends(require_auth)) -> dict:
+    """The filtered list as an email, with the schedule PDF attached.
+
+    Each address gets its own message, so customers on one send never see
+    each other's addresses.
+    """
+    if not mailer.is_configured():
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Email is not set up yet — the SMTP settings are missing.")
+
+    rows, where, data, filename = _render(body.filters)
+    if not rows:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, NOTHING_TO_SEND)
+
+    subject = body.subject.strip() or share_text.email_subject(where)
+    text = share_text.email_body(where, rows, note=body.note)
+    attachment = [(filename, data, "application/pdf")]
+
+    sent, failed = [], []
+    for address in dict.fromkeys(str(a) for a in body.to):  # de-duplicated, order kept
+        try:
+            await mailer.send_mail(address, subject, text, attachment)
+            sent.append(address)
+        except mailer.MailSendFailed as exc:
+            failed.append((address, str(exc)))
+
+    log.info("share/email by %r: %d sent, %d failed, %d sailings", user.username, len(sent), len(failed), len(rows))
+    if failed and not sent:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, failed[0][1])
+
+    message = f"Email sent to {', '.join(sent)}"
+    if failed:
+        message += f" — not sent to {', '.join(a for a, _ in failed)}"
+    return {"status": "ok", "data": {"sent": sent, "failed": [a for a, _ in failed], "count": len(rows)}, "message": message}
 
 
 @router.post("/share/whatsapp")
-def share_whatsapp(body: WhatsAppIn, user: CurrentUser = Depends(require_auth)):
-    """Interakt template message carrying the schedule PDF."""
-    raise _not_built("WhatsApp share")
+async def share_whatsapp(body: WhatsAppIn, user: CurrentUser = Depends(require_auth)) -> dict:
+    """Interakt template message carrying the schedule PDF. With `save`, the
+    number is remembered once the send has gone through — as in the reference."""
+    digits = whatsapp.normalise_number(body.number)
+    if not digits:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Please enter a valid WhatsApp number.")
+    if not whatsapp.is_configured():
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "WhatsApp is not set up yet — the Interakt settings are missing.")
+
+    rows, where, data, filename = _render(body.filters)
+    if not rows:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, NOTHING_TO_SEND)
+
+    token = shared_pdfs.save(data)
+    try:
+        await whatsapp.send_template(
+            digits,
+            shared_pdfs.public_url(token),
+            filename,
+            share_text.whatsapp_body_values(where, len(rows)),
+        )
+    except whatsapp.WhatsAppSendFailed as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from None
+
+    if body.save:
+        wa_contacts.save(body.name, digits)
+
+    log.info("share/whatsapp by %r to +%s, %d sailings", user.username, digits, len(rows))
+    return {"status": "ok", "data": {"to": f"+{digits}", "count": len(rows)}, "message": f"Sent to +{digits}"}
+
+
+@public_router.get("/shared/{name}", include_in_schema=False)
+def shared_pdf(name: str, request: Request):
+    """The PDF behind a WhatsApp message, for Interakt to download. No session;
+    the unguessable token in the name is the only key, and it expires."""
+    token = name[:-4] if name.endswith(".pdf") else ""
+    path = shared_pdfs.path_for(token)
+    if path is None:
+        # A plain response, not HTTPException: main.py's handler re-raises
+        # HTTP errors outside /api, which would surface as a 500.
+        return Response(status_code=status.HTTP_404_NOT_FOUND, content="Not found", media_type="text/plain")
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename="Sailing_Schedule.pdf",
+        content_disposition_type="inline",
+        headers={"X-Robots-Tag": "noindex", "Cache-Control": "private, max-age=86400"},
+    )

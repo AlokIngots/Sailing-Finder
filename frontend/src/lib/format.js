@@ -57,6 +57,27 @@ export function formatDate(value) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+/** Short form used on the sailing cards: 29 Sep. Em dash when missing. */
+export function formatShort(value) {
+  const d = parseDate(value);
+  if (!d) return '—';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+/**
+ * Vessel and voyage as the reference shows them: anything in brackets comes
+ * off the vessel name, and a bracketed voyage like "(270E)" fills in a missing
+ * voyage number.
+ */
+export function tidyVessel(sailing) {
+  const raw = sailing.vessel_name || '';
+  let voyage = sailing.voyage_no || '';
+  const inBrackets = /\((\d{2,}[A-Z])\)/.exec(raw);
+  if (!voyage && inBrackets) voyage = inBrackets[1];
+  const vessel = raw.replace(/\s*\([^)]*\)/g, '').trim();
+  return { vessel: vessel || raw, voyage };
+}
+
 /** 'Direct' / 'Indirect' / '' for display, from the server's ship_type. */
 export function shipTypeLabel(shipType) {
   if (shipType === 'direct') return 'Direct';

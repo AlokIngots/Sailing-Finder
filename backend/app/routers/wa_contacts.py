@@ -1,8 +1,7 @@
 """Saved WhatsApp numbers for the share dropdown.
 
 `number` is stored as digits including country code — no +, no spaces.
-
-SCAFFOLD: handlers are stubs. Built on feature/share.
+Shared across all users, as in the Apps Script version.
 """
 
 from __future__ import annotations
@@ -11,15 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.deps import CurrentUser, require_auth
+from app.services import wa_contacts
 
 router = APIRouter()
-
-
-def _not_built(name: str) -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail=f"{name} is not built yet.",
-    )
 
 
 class ContactIn(BaseModel):
@@ -28,11 +21,15 @@ class ContactIn(BaseModel):
 
 
 @router.get("/wa-contacts")
-def list_contacts(user: CurrentUser = Depends(require_auth)):
-    raise _not_built("WhatsApp contacts")
+def list_contacts(user: CurrentUser = Depends(require_auth)) -> dict:
+    return {"status": "ok", "data": wa_contacts.list_all(), "message": ""}
 
 
 @router.post("/wa-contacts")
-def save_contact(body: ContactIn, user: CurrentUser = Depends(require_auth)):
+def save_contact(body: ContactIn, user: CurrentUser = Depends(require_auth)) -> dict:
     """Remember a number. Upsert on `number`, so saving twice is harmless."""
-    raise _not_built("Save WhatsApp contact")
+    try:
+        digits = wa_contacts.save(body.name, body.number)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from None
+    return {"status": "ok", "data": {"name": body.name.strip(), "number": digits}, "message": "Saved."}

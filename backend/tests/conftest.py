@@ -46,6 +46,8 @@ class FakeDb:
         #: rows through and shapes them.
         self.rows: list[dict] = []
         self.queries: list[tuple[str, object]] = []
+        #: (name, number) in insertion order — services/wa_contacts.
+        self.wa_contacts: list[tuple[str, str]] = []
 
     # --- helpers used by tests ---
     def add_user(self, username, password_hash, name="", role="user", is_active=True) -> dict:
@@ -122,6 +124,8 @@ class FakeDb:
 
     def fetch_all(self, sql: str, params=()):
         self.queries.append((sql, params))
+        if "FROM wa_contacts" in sql:
+            return [{"name": n, "number": num} for n, num in self.wa_contacts]
         if "FROM users" in sql:
             # services/users.list_active
             active = [u for u in self.users.values() if u["is_active"]]
@@ -129,6 +133,14 @@ class FakeDb:
         return list(self.rows)
 
     def execute(self, sql: str, params=()) -> int:
+        if "INSERT INTO wa_contacts" in sql:
+            # ON CONFLICT (number) DO NOTHING
+            name, number = params
+            if any(num == number for _, num in self.wa_contacts):
+                return 0
+            self.wa_contacts.append((name, number))
+            return 1
+
         if "INSERT INTO sessions" in sql:
             sid, user_id, expires_at, user_agent, ip = params
             self.sessions[sid] = {

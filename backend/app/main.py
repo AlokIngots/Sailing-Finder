@@ -114,6 +114,10 @@ app.include_router(share.router, prefix="/api", tags=["share"])
 app.include_router(wa_contacts.router, prefix="/api", tags=["wa-contacts"])
 app.include_router(users.router, prefix="/api", tags=["users"])
 
+# The one non-/api route with no session: /shared/<token>.pdf, the PDF Interakt
+# downloads for a WhatsApp send. Registered before the SPA catch-all below.
+app.include_router(share.public_router)
+
 
 @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False)
 def api_not_found(rest: str):
