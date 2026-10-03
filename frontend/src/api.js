@@ -75,6 +75,11 @@ export const api = {
   scheduleFilters: (country, signal) =>
     request(`/schedule/filters${queryString({ country })}`, { signal }),
 
+  // --- users (admin only; the server answers 403 for anyone else) ---
+  users: (signal) => request('/users', { signal }),
+  createUser: (payload) => request('/users', { method: 'POST', body: payload }),
+  removeUser: (username) => request(`/users/${encodeURIComponent(username)}`, { method: 'DELETE' }),
+
   // --- everything below arrives with its own feature branch ---
   forwarders: () => request('/forwarders'),
 

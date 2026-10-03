@@ -437,11 +437,188 @@ input:disabled {
   color: var(--muted);
 }
 
+/* --- admin nav ---------------------------------------------------------- */
+
+.app-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.app-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.app-nav a:hover {
+  color: var(--navy);
+  background: var(--tint);
+}
+
+.app-nav a.active {
+  color: var(--navy);
+  background: var(--tint);
+  font-weight: 600;
+}
+
+/* --- users (admin) ------------------------------------------------------ */
+
+.users {
+  display: grid;
+  gap: 16px;
+  max-width: 960px;
+  padding: 16px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+  color: var(--navy);
+}
+
+.panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 16px;
+  color: var(--navy);
+}
+
+.panel-title .count {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.user-form {
+  background: var(--tint);
+}
+
+.user-form-grid {
+  display: grid;
+  gap: 12px;
+  align-items: start;          /* the password hint must not stretch Role */
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.user-form-actions button {
+  width: 100%;
+}
+
+.load-failed {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.user-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Mobile: a card per user, name on top, tags and Remove underneath. */
+.user-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.user-who {
+  grid-column: 1 / -1;
+  display: grid;
+  min-width: 0;
+}
+
+.user-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-username {
+  font-size: 13px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.user-actions {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 4px;
+}
+
+/* Removing someone is the one destructive action on the screen, so its
+   confirm step carries the signal colour. */
+button.danger {
+  border-color: var(--red);
+  background: var(--red);
+  color: var(--paper);
+}
+
 /* --- desktop ------------------------------------------------------------ */
 
 @media (min-width: 720px) {
   .app-header {
     padding: 14px 24px;
+  }
+
+  .users {
+    padding: 20px 24px;
+  }
+
+  .panel {
+    padding: 20px;
+  }
+
+  .user-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .user-form-actions button {
+    width: auto;
+  }
+
+  /* Card becomes a row: who | tags | action. */
+  .user-row {
+    grid-template-columns: minmax(0, 1fr) 140px 220px;
+    gap: 16px;
+  }
+
+  .user-who {
+    grid-column: auto;
   }
 
   .app-user {

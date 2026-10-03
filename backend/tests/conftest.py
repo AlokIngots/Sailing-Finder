@@ -56,6 +56,7 @@ class FakeDb:
             "name": name or username,
             "role": role,
             "is_active": is_active,
+            "created_at": datetime.now(timezone.utc),
         }
         self._next_id += 1
         self.users[username] = user
@@ -63,6 +64,29 @@ class FakeDb:
 
     # --- the app.db surface ---
     def fetch_one(self, sql: str, params=()):
+        if "INSERT INTO users" in sql and "WHERE users.is_active = FALSE" in sql:
+            # services/users.create — insert, reactivate a removed account, or
+            # return nothing when an active account already has the username.
+            username, password_hash, name, role = params
+            existing = self.users.get(username)
+            if existing and existing["is_active"]:
+                return None
+            if existing:
+                existing.update(
+                    password_hash=password_hash, name=name, role=role, is_active=True
+                )
+                return {**existing, "was_inserted": False}
+            created = self.add_user(username, password_hash, name=name, role=role)
+            return {**created, "was_inserted": True}
+
+        if "UPDATE users" in sql and "is_active = FALSE" in sql:
+            # services/users.deactivate
+            user = self.users.get(params[0])
+            if not user or not user["is_active"]:
+                return None
+            user["is_active"] = False
+            return {"id": user["id"]}
+
         if "INSERT INTO users" in sql:
             # scripts/create_user.py — upsert on username, RETURNING whether it
             # was an insert or an update.
@@ -98,6 +122,10 @@ class FakeDb:
 
     def fetch_all(self, sql: str, params=()):
         self.queries.append((sql, params))
+        if "FROM users" in sql:
+            # services/users.list_active
+            active = [u for u in self.users.values() if u["is_active"]]
+            return [dict(u) for u in sorted(active, key=lambda u: u["username"])]
         return list(self.rows)
 
     def execute(self, sql: str, params=()) -> int:

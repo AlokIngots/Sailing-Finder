@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 
 import api from './api.js';
 import Bookings from './components/Bookings.jsx';
 import Finder from './components/Finder.jsx';
 import Login from './components/Login.jsx';
 import Shipment from './components/Shipment.jsx';
+import Users from './components/Users.jsx';
 
 /**
  * Routes plus the auth gate.
@@ -64,10 +65,21 @@ export default function App() {
     return <Login onSignedIn={setUser} serverError={bootError} />;
   }
 
+  const isAdmin = user.role === 'admin';
+
   return (
     <div className="app">
       <header className="app-header">
         <span className="app-title">Sailing Finder</span>
+        {/* Only admins have more than one screen to move between. */}
+        {isAdmin ? (
+          <nav className="app-nav" aria-label="Main">
+            <NavLink to="/" end>
+              Finder
+            </NavLink>
+            <NavLink to="/users">Users</NavLink>
+          </nav>
+        ) : null}
         <span className="app-user" title={user.role}>
           {user.name}
         </span>
@@ -80,6 +92,9 @@ export default function App() {
         <Route path="/" element={<Finder user={user} />} />
         <Route path="/bookings" element={<Bookings user={user} />} />
         <Route path="/bookings/:ref" element={<Shipment user={user} />} />
+        {/* A non-admin typing /users falls through to the redirect below; the
+            API behind the screen answers them 403 regardless. */}
+        {isAdmin ? <Route path="/users" element={<Users />} /> : null}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

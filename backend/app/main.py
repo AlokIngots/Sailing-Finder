@@ -22,7 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import config, db
 from app.config import settings
-from app.routers import auth, bookings, schedule, share, wa_contacts
+from app.routers import auth, bookings, schedule, share, users, wa_contacts
 
 logging.basicConfig(
     level=logging.INFO,
@@ -112,6 +112,7 @@ app.include_router(schedule.router, prefix="/api", tags=["schedule"])
 app.include_router(bookings.router, prefix="/api", tags=["bookings"])
 app.include_router(share.router, prefix="/api", tags=["share"])
 app.include_router(wa_contacts.router, prefix="/api", tags=["wa-contacts"])
+app.include_router(users.router, prefix="/api", tags=["users"])
 
 
 @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False)
