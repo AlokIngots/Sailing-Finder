@@ -16,7 +16,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -131,6 +131,17 @@ def api_not_found(rest: str):
 # frontend/dist. Serving it from the backend keeps one origin, so the session
 # cookie works without CORS.
 # ---------------------------------------------------------------------------
+def inside_dist(dist_root: Path, full_path: str) -> Path | None:
+    """`full_path` resolved under `dist_root` (already resolved), or None when
+    it would land anywhere outside it — '..' segments, backslashes, an
+    absolute path, a symlink out, or a path the OS cannot even resolve."""
+    try:
+        candidate = (dist_root / full_path).resolve()
+    except (OSError, ValueError):  # e.g. an embedded NUL byte
+        return None
+    return candidate if candidate.is_relative_to(dist_root) else None
+
+
 def _dist_dir() -> Path | None:
     for candidate in (
         os.environ.get("FRONTEND_DIST"),
@@ -146,15 +157,26 @@ dist = _dist_dir()
 if dist:
     app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
 
+    dist_root = dist.resolve()
+
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa(full_path: str):
         """React Router handles the three views client-side, so any non-API
         path serves index.html. index.html contains no schedule data — it is
-        fetched after login."""
-        asset = dist / full_path
-        if full_path and asset.is_file():
-            return FileResponse(asset)
-        return FileResponse(dist / "index.html")
+        fetched after login.
+
+        This route has no login, so a file is only ever served from inside the
+        build folder. The path arrives URL-decoded, so '..%2f', '%2e%2e/',
+        '..%5c' and absolute paths are all caught by resolving it first and
+        refusing anything that lands outside dist — 404, never a fallback.
+        """
+        if full_path:
+            asset = inside_dist(dist_root, full_path)
+            if asset is None:
+                return PlainTextResponse("Not found", status_code=404)
+            if asset.is_file():
+                return FileResponse(asset)
+        return FileResponse(dist_root / "index.html")
 
 else:  # pragma: no cover - only before the first `npm run build`
     log.warning("frontend build not found — run `npm run build` in frontend/")

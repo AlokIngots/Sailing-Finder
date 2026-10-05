@@ -82,6 +82,7 @@ export const api = {
 
   // --- everything below arrives with its own feature branch ---
   forwarders: () => request('/forwarders'),
+  enquiryOrigin: () => request('/enquiry-origin'),
 
   bookings: (signal) => request('/bookings', { signal }),
   enquiry: (payload) => request('/enquiry', { method: 'POST', body: payload }),

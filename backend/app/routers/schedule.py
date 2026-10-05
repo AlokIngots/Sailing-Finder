@@ -14,9 +14,10 @@ import logging
 from datetime import date
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 
 from app import db
+from app.config import settings
 from app.deps import CurrentUser, require_auth
 from app.services import ports
 
@@ -272,11 +273,9 @@ def get_filters(
 
 @router.get("/forwarders")
 def get_forwarders(user: CurrentUser = Depends(require_auth)):
-    """Names only. The addresses stay server-side and never reach the browser.
-
-    Built on feature/enquiry — the finder does not need it.
-    """
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Forwarders is not built yet.",
-    )
+    """Names only. The addresses stay server-side and never reach the browser."""
+    return {
+        "status": "ok",
+        "data": [{"id": f.id, "name": f.name} for f in settings.forwarders],
+        "message": "",
+    }

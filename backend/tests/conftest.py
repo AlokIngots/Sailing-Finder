@@ -102,6 +102,10 @@ class FakeDb:
             created = self.add_user(username, password_hash, name=name, role=role)
             return {"id": created["id"], "was_inserted": True}
 
+        if "FROM schedule WHERE row_key" in sql:
+            # routers/bookings.create_enquiry — one sailing by its key.
+            return next((dict(r) for r in self.rows if r["row_key"] == params[0]), None)
+
         if "FROM users" in sql and "WHERE username" in sql:
             user = self.users.get(params[0])
             return dict(user) if user else None

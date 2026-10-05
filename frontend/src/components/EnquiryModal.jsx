@@ -18,19 +18,26 @@ import { formatDate, tidyVessel } from '../lib/format.js';
 
 const COMMODITY = 'Stainless steel bright bars';
 
-function buildEmail(sailing, fields) {
+/**
+ * The server sends its own copy of this email (backend/app/services/
+ * enquiry_email.py) — the two must produce the same text. Change both together.
+ *
+ * `origin` is the port-of-loading label from GET /api/enquiry-origin (config
+ * ENQUIRY_ORIGIN_PORT / _CODE). The sailing's own origin is never used.
+ */
+function buildEmail(sailing, fields, origin) {
   const { vessel, voyage } = tidyVessel(sailing);
   const port = sailing.pod_name || sailing.pod_code;
   const where = `${port}${sailing.country ? `, ${sailing.country}` : ''}`;
   const transit = Number.isFinite(sailing.transit_days) ? sailing.transit_days : null;
 
-  const subject = `Booking request — Nhava Sheva to ${where} (${sailing.carrier} ${vessel})`;
+  const subject = `Booking request — ${origin} to ${where} (${sailing.carrier} ${vessel})`;
   const L = [];
   L.push('We would like to book the shipment below. Please send your best all-in rate and the latest booking cut-off for this vessel.');
   L.push('');
   L.push(`Carrier: ${sailing.carrier}`);
   L.push(`Vessel / voyage: ${vessel}${voyage ? ` / ${voyage}` : ''}`);
-  L.push('From: Nhava Sheva (INNSA)');
+  L.push(`From: ${origin}`);
   L.push(`To: ${where}${sailing.pod_code ? ` (${sailing.pod_code})` : ''}`);
   L.push(`ETD: ${formatDate(sailing.etd) || '—'}   ETA: ${formatDate(sailing.eta) || '—'}${transit !== null ? `   Transit: ${transit} days` : ''}`);
   if (fields.stuffing) L.push(`Stuffing date: ${fields.stuffing}`);
@@ -49,12 +56,33 @@ function buildEmail(sailing, fields) {
   return { subject, body: L.join('\n') };
 }
 
-function Recipients({ forwarders }) {
+/** One checkbox per forwarder — styled like "Remember this number" in Finder. */
+function ForwarderPicker({ forwarders, selected, onToggle }) {
+  if (!forwarders.length) return null;
+  return (
+    <div className="bk-grid" style={{ marginTop: 12 }}>
+      <div className="control bk-full">
+        <label className="lbl">Forwarders</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px', marginTop: 4 }}>
+          {forwarders.map((f) => (
+            <label key={f.id} className="lbl" style={{ display: 'flex', alignItems: 'center', gap: 6, textTransform: 'none', fontSize: 13 }}>
+              <input type="checkbox" style={{ width: 'auto', height: 'auto' }} checked={selected.has(f.id)} onChange={() => onToggle(f.id)} /> {f.name}
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Recipients({ forwarders, selected }) {
   if (!forwarders.length) return <div className="recips">No forwarders are set up yet.</div>;
+  const chosen = forwarders.filter((f) => selected.has(f.id));
+  if (!chosen.length) return <div className="recips">No forwarders selected — tick at least one.</div>;
   return (
     <div className="recips">
       Will be emailed to:{' '}
-      {forwarders.map((f, i) => (
+      {chosen.map((f, i) => (
         <span key={f.id || f.name}>
           {i ? ', ' : ''}
           <b>{f.name}</b>
@@ -75,15 +103,34 @@ export default function EnquiryModal({ sailing, onClose, flash }) {
   });
   const [reviewing, setReviewing] = useState(false);
   const [forwarders, setForwarders] = useState([]);
+  const [selected, setSelected] = useState(() => new Set());
+  const [origin, setOrigin] = useState('');
   const [toast, setToast] = useState('');
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
     api
       .forwarders()
-      .then((list) => setForwarders(Array.isArray(list) ? list : []))
+      .then((list) => {
+        const all = Array.isArray(list) ? list : [];
+        setForwarders(all);
+        setSelected(new Set(all.map((f) => f.id))); // all ticked by default
+      })
       .catch(() => setForwarders([]));
+    api
+      .enquiryOrigin()
+      .then((o) => setOrigin((o && o.label) || ''))
+      .catch(() => setOrigin(''));
   }, []);
+
+  const toggle = (id) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const chosenIds = forwarders.filter((f) => selected.has(f.id)).map((f) => f.id);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -98,15 +145,21 @@ export default function EnquiryModal({ sailing, onClose, flash }) {
   const { vessel, voyage } = tidyVessel(sailing);
   const port = sailing.pod_name || sailing.pod_code;
   const transit = Number.isFinite(sailing.transit_days) ? ` · ${sailing.transit_days} days` : '';
-  const email = reviewing ? buildEmail(sailing, fields) : null;
+  const email = reviewing ? buildEmail(sailing, fields, origin) : null;
 
   async function send() {
+    if (!chosenIds.length) return;
     setToast('Sending…');
     setSending(true);
     try {
-      await api.enquiry({ row_key: sailing.row_key, ...fields });
+      const result = await api.enquiry({ row_key: sailing.row_key, ...fields, forwarder_ids: chosenIds });
       onClose();
-      flash('Booking request sent to the forwarders.');
+      const failed = (result && result.failed) || [];
+      flash(
+        failed.length
+          ? `Booking request sent to ${result.sent.join(', ')} — not sent to ${failed.join(', ')}.`
+          : 'Booking request sent to the forwarders.',
+      );
     } catch (err) {
       setToast(`Could not send: ${err.message}`);
     } finally {
@@ -130,7 +183,7 @@ export default function EnquiryModal({ sailing, onClose, flash }) {
               <b>{vessel}</b>
               {voyage ? ` (${voyage})` : ''} — {sailing.carrier}
               <br />
-              Nhava Sheva → {port}
+              {origin || '—'} → {port}
               {sailing.country ? `, ${sailing.country}` : ''}
               <br />
               Departs {formatDate(sailing.etd) || '—'} · Arrives {formatDate(sailing.eta) || '—'}
@@ -168,7 +221,8 @@ export default function EnquiryModal({ sailing, onClose, flash }) {
                 <textarea id="bkRemarks" style={{ minHeight: 70 }} placeholder="Any target rate, free-time need, or note" value={fields.remarks} onChange={set('remarks')} />
               </div>
             </div>
-            <Recipients forwarders={forwarders} />
+            <ForwarderPicker forwarders={forwarders} selected={selected} onToggle={toggle} />
+            <Recipients forwarders={forwarders} selected={selected} />
             <div className="modal-actions">
               <button type="button" className="btn primary" onClick={() => setReviewing(true)}>
                 Review request
@@ -190,10 +244,10 @@ export default function EnquiryModal({ sailing, onClose, flash }) {
               <label className="lbl" htmlFor="bkBody">Email</label>
               <textarea id="bkBody" value={email.body} readOnly />
             </div>
-            <Recipients forwarders={forwarders} />
+            <Recipients forwarders={forwarders} selected={selected} />
             <div className="mtoast" role="status">{toast}</div>
             <div className="modal-actions">
-              <button type="button" className="btn primary" onClick={send} disabled={sending}>
+              <button type="button" className="btn primary" onClick={send} disabled={sending || !chosenIds.length}>
                 Send to forwarders
               </button>
               <button
