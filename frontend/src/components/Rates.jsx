@@ -104,6 +104,8 @@ export default function Rates({ flash, isAdmin }) {
                   {forwarders.map((name) =>
                     byName[name] ? (
                       <td key={name}>
+                        {/* Names the cell when the table stacks on a phone. */}
+                        <div className="mlbl">{name}</div>
                         <RateCell enquiryRef={row.ref} quote={byName[name]} forwarder={name} flash={flash} />
                       </td>
                     ) : (

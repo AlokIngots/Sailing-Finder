@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 import api from './api.js';
+import { clearApiCache } from './pwa.js';
 import Bookings from './components/Bookings.jsx';
 import Finder from './components/Finder.jsx';
 import Login from './components/Login.jsx';
@@ -89,6 +90,8 @@ export default function App() {
       // Already gone server-side, or the network dropped. Either way this
       // browser is done with the session.
     } finally {
+      // The offline copies of this user's data go with the session.
+      clearApiCache();
       setCustomerView(false);
       setUser(null);
     }

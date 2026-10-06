@@ -63,10 +63,10 @@ function ForwarderPicker({ forwarders, selected, onToggle }) {
     <div className="bk-grid" style={{ marginTop: 12 }}>
       <div className="control bk-full">
         <label className="lbl">Forwarders</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px', marginTop: 4 }}>
+        <div className="fwdlist">
           {forwarders.map((f) => (
-            <label key={f.id} className="lbl" style={{ display: 'flex', alignItems: 'center', gap: 6, textTransform: 'none', fontSize: 13 }}>
-              <input type="checkbox" style={{ width: 'auto', height: 'auto' }} checked={selected.has(f.id)} onChange={() => onToggle(f.id)} /> {f.name}
+            <label key={f.id} className="lbl fwdopt">
+              <input type="checkbox" checked={selected.has(f.id)} onChange={() => onToggle(f.id)} /> {f.name}
             </label>
           ))}
         </div>

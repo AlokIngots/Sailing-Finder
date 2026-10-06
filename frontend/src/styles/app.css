@@ -221,18 +221,9 @@ a.btn{text-decoration:none}
 .empty.failed h3{color:var(--signal)}
 .empty.failed .btn{margin-top:14px}
 
-/* Phones. The reference has no viewport tag, so a phone renders it at ~980px
-   and shrinks it; with a real viewport its one-line header runs off a 400px
-   screen (Customer view and Sign out end up unreachable) and the date pairs
-   spill out of the panel. Below 600px only: the tabs take their own line and
-   date inputs may shrink. Wider than that, nothing here applies. */
-@media (max-width:600px){
-  .top-in{flex-wrap:wrap;row-gap:10px}
-  .top-in .nav{order:5;margin-left:0;flex:1 1 100%}
-  .top-in .nav button{flex:1 1 auto;justify-content:center;white-space:nowrap}
-  .viewtoggle{margin-left:auto}
-  .control.dates,.pair input[type="date"]{min-width:0}
-}
+/* The header may wrap rather than run off the side when the tabs, Customer
+   view and Sign out don't fit on one line. Phones: see the end of the file. */
+.top-in{flex-wrap:wrap;row-gap:10px}
 
 /* --- Users (admin only) --------------------------------------------------- */
 .users input[type="password"]{font-family:var(--sans);font-size:14.5px;color:var(--navy);background:#fff;border:1px solid var(--border-strong);border-radius:11px;padding:11px 13px;width:100%;height:44px}
@@ -271,3 +262,108 @@ table.rates td.na{color:var(--muted-2);text-align:center;padding-top:16px}
 .pickrow{display:flex;gap:8px;align-items:stretch}
 .pickrow input{flex:1 1 auto;min-width:0}
 .pickrow .btn{flex:none;white-space:nowrap}
+
+/* Phone labels: only shown when a table is stacked into cards (below). */
+.mlbl{display:none}
+
+/* Enquire modal: the forwarder tick boxes. */
+.fwdlist{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:4px}
+.fwdopt{display:flex;align-items:center;gap:6px;text-transform:none;font-size:13px}
+.fwdopt input{width:auto;height:auto}
+
+/* ==========================================================================
+   Phones and small tablets — below 768px. Wider screens are untouched.
+   Nothing here may make the page scroll sideways: every row wraps or stacks.
+   ========================================================================== */
+@media (max-width:767.98px){
+  /* iOS Safari zooms into any field under 16px; and an un-styled iOS date
+     field keeps its own width and can push past the screen edge. */
+  select,input[type="date"],input[type="email"],input[type="text"],input[type="tel"],input[type="password"],textarea,.modal textarea{font-size:16px}
+  input[type="date"]{-webkit-appearance:none;appearance:none;min-width:0;display:block;text-align:left}
+  input[type="date"]::-webkit-date-and-time-value{text-align:left}
+  .control.dates,.pair input[type="date"]{min-width:0}
+
+  /* Header: logo + Sign out, then the tabs (wrapping, never cut off), then
+     Customer view. Not sticky, so the list gets the screen. */
+  header.top{position:static}
+  .top-in{column-gap:10px}
+  .brand{flex:1 1 auto;min-width:0}
+  .brand p{display:none}
+  .logoutbtn{order:2;margin-left:0;min-height:40px}
+  .top-in .nav{order:5;flex:1 1 100%;margin-left:0;flex-wrap:wrap}
+  .top-in .nav button{flex:1 1 auto;justify-content:center;white-space:nowrap;min-height:40px;padding:8px 10px}
+  .viewtoggle{order:6;flex:1 1 100%;margin-left:0;justify-content:flex-end;min-height:32px}
+
+  .bkhead{flex-wrap:wrap;row-gap:2px}
+  #flash{max-width:calc(100vw - 32px);text-align:center}
+
+  /* Find sailings — filters stacked, each full width, 44px fields. */
+  .fstrip{flex-direction:column;align-items:stretch;gap:12px}
+  .fctl,.fctl.dates{flex:none;width:100%}
+  .fstrip label.lbl{font-size:11px}
+  .fstrip select,.fstrip input[type="date"]{height:44px;font-size:16px}
+  .resetlink{margin-left:0;align-self:flex-end;height:44px}
+
+  /* Toolbar: count, then each toggle and the sort on its own full-width
+     row, then the actions two per row. */
+  .toolbar{flex-direction:column;align-items:stretch}
+  .tgroup .count{flex:1 1 100%}
+  .tgroup .seg{flex:1 1 100%;display:flex}
+  .seg button{flex:1 1 0;min-height:44px;font-size:13.5px}
+  .minisort{flex:1 1 100%;width:100%;height:44px;font-size:16px}
+  .tgroup.tactions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-left:0}
+  .tactions .btn{justify-content:center;min-height:44px}
+
+  /* The sailings table becomes one card per sailing — same markup. */
+  .tablebox{background:none;border:0;border-radius:0;overflow:visible}
+  table.sails{min-width:0;display:block}
+  table.sails thead{display:none}
+  table.sails tbody{display:flex;flex-direction:column;gap:10px}
+  table.sails tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"ves ves" "where where" "dep arr" "act act";gap:10px 12px;position:relative;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
+  table.sails td{display:block;height:auto;padding:0;border:0;min-width:0}
+  table.sails tbody tr:hover td{background:none}
+  table.sails td.ves{grid-area:ves;padding-right:84px}
+  table.sails td.where{grid-area:where}
+  table.sails td.kind{position:absolute;top:14px;right:14px}
+  table.sails td.kind:empty{display:none}
+  table.sails td.dep{grid-area:dep}
+  table.sails td.arr{grid-area:arr}
+  table.sails td.dep,table.sails td.arr{background:var(--ground);border-radius:10px;padding:8px 10px}
+  table.sails td.act{grid-area:act;width:auto;text-align:left}
+  table.sails td.act .btn{width:100%;justify-content:center;min-height:44px;font-size:14px}
+  table.sails .vessel{font-size:15px}
+  table.sails .date{font-size:15px}
+  table.sails .mlbl{display:block;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-2);font-weight:600;margin-bottom:1px}
+
+  /* WhatsApp / Email boxes: every field full width, buttons tappable. */
+  .mailrow .control{flex:1 1 100%}
+  .mailrow .btn{flex:1 1 auto;justify-content:center;min-height:44px}
+  .pickrow{flex-wrap:wrap}
+  .pickrow .btn{flex:1 1 100%;justify-content:center;min-height:44px}
+
+  /* Enquire modal: fields stack (bk-grid already wraps), buttons and tick
+     boxes big enough to tap. */
+  .modal-bg{padding:12px 10px}
+  .modal{padding:16px}
+  .bk-grid .control{flex:1 1 100%}
+  .modal-actions .btn{flex:1 1 auto;justify-content:center;min-height:44px}
+  .fwdlist{gap:4px 18px}
+  .fwdopt{min-height:44px;font-size:14px}
+  .fwdopt input{width:20px;height:20px}
+
+  /* Rate summary: one card per enquiry, one labelled rate box per forwarder.
+     Cells for forwarders it wasn't sent to are dropped. */
+  .ratewrap{padding:0;background:none;border:0;overflow:visible}
+  table.rates{min-width:0;display:block}
+  table.rates thead{display:none}
+  table.rates tbody{display:flex;flex-direction:column;gap:10px}
+  table.rates tr{display:block;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:4px 14px 12px}
+  table.rates th.enq{display:block;position:static;min-width:0;padding:10px 0;border-bottom:1px solid var(--border)}
+  table.rates td{display:block;min-width:0;padding:10px 0 0;border:0}
+  table.rates td.na{display:none}
+  table.rates .mlbl{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-2);margin-bottom:4px}
+  .ratecell input[type="text"]{height:44px;font-size:16px}
+
+  /* Users: the remove buttons tappable. */
+  .urow .uact .btn{min-height:40px}
+}
