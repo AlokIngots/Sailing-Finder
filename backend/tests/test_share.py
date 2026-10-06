@@ -227,7 +227,7 @@ def test_preview_rejects_a_bad_date(signed_in):
 
 
 EMAIL = {"to": ["buyer@example.com"], "filters": {"country": "Italy", "etd_from": ""}}
-WA = {"number": "98672 00083", "save": True, "name": "Buyer", "filters": {"country": "Italy"}}
+WA = {"number": "98672 00083", "name": "Buyer", "filters": {"country": "Italy"}}
 
 
 def test_email_without_smtp_settings_says_so(signed_in, monkeypatch, use_settings):
@@ -288,7 +288,7 @@ def test_whatsapp_sends_the_template_and_remembers_the_number(signed_in, fake_db
     assert digits == "919867200083"
     assert url.startswith("https://sailing.example.com/shared/") and url.endswith(".pdf")
     assert values[0] == "Italy" and values[2] == "2"
-    assert ("Buyer", "919867200083") in fake_db.wa_contacts
+    assert saved(fake_db, "wa") == [("priya", "919867200083", "Buyer")]
 
     # The link Interakt downloads works without a session, and serves the PDF.
     signed_in.cookies.clear()
@@ -309,7 +309,7 @@ def test_a_failed_whatsapp_send_does_not_remember_the_number(signed_in, fake_db,
     response = signed_in.post("/api/share/whatsapp", json=WA)
     assert response.status_code == 502
     assert "Interakt error 400" in response.json()["message"]
-    assert fake_db.wa_contacts == []
+    assert fake_db.saved_contacts == []
 
 
 @pytest.mark.parametrize("name", ["nope.pdf", "....pdf", "a" * 50, ("x" * 43) + ".pdf"])
@@ -337,8 +337,88 @@ def test_shared_links_expire(monkeypatch, tmp_path, use_settings):
     assert shared_pdfs.purge_old() == 1
 
 
+def saved(fake_db, kind):
+    """(username, value, name) of the saved contacts of one kind."""
+    return [(c["username"], c["value"], c["name"]) for c in fake_db.saved_contacts if c["kind"] == kind]
+
+
+def sign_in_as(client, fake_db, username, role="user"):
+    client.cookies.clear()
+    fake_db.add_user(username, security.hash_password(GOOD_PASSWORD), name=username.title(), role=role)
+    assert client.post("/api/login", json={"username": username, "password": GOOD_PASSWORD}).status_code == 200
+
+
 def test_saved_numbers_list_and_save(signed_in, fake_db):
     assert signed_in.post("/api/wa-contacts", json={"name": "Buyer", "number": "98672 00083"}).status_code == 200
-    assert signed_in.post("/api/wa-contacts", json={"name": "Again", "number": "+919867200083"}).status_code == 200
-    assert fake_db.wa_contacts == [("Buyer", "919867200083")]
+    assert signed_in.post("/api/wa-contacts", json={"name": "", "number": "+919867200083"}).status_code == 200
+    assert saved(fake_db, "wa") == [("priya", "919867200083", "Buyer")]  # one entry, name kept
     assert signed_in.get("/api/wa-contacts").json()["data"] == [{"name": "Buyer", "number": "919867200083"}]
+
+
+def test_saved_lists_are_most_recently_used_first(signed_in, fake_db):
+    for number in ("9800000001", "9800000002", "9800000001"):
+        signed_in.post("/api/wa-contacts", json={"number": number})
+    numbers = [c["number"] for c in signed_in.get("/api/wa-contacts").json()["data"]]
+    assert numbers == ["919800000001", "919800000002"]
+
+
+def test_saved_lists_are_per_user_and_admin_sees_all(signed_in, fake_db):
+    signed_in.post("/api/wa-contacts", json={"name": "Priya's buyer", "number": "9800000001"})
+    signed_in.post("/api/email-contacts", json={"email": "priya-buyer@example.com"})
+
+    sign_in_as(signed_in, fake_db, "ravi")
+    assert signed_in.get("/api/wa-contacts").json()["data"] == []
+    assert signed_in.get("/api/email-contacts").json()["data"] == []
+    signed_in.post("/api/wa-contacts", json={"number": "9800000002"})
+    assert [c["number"] for c in signed_in.get("/api/wa-contacts").json()["data"]] == ["919800000002"]
+
+    sign_in_as(signed_in, fake_db, "boss", role="admin")
+    assert [c["number"] for c in signed_in.get("/api/wa-contacts").json()["data"]] == ["919800000002", "919800000001"]
+    assert signed_in.get("/api/email-contacts").json()["data"] == [{"name": "", "email": "priya-buyer@example.com"}]
+
+
+def test_saved_lists_need_a_session(client):
+    assert client.get("/api/wa-contacts").status_code == 401
+    assert client.get("/api/email-contacts").status_code == 401
+
+
+def test_a_sent_email_address_is_saved_once_with_its_name(signed_in, fake_db, monkeypatch, use_settings):
+    use_settings(smtp_pass="real-secret")
+
+    async def fake_send(to, subject, text, attachments=None, reply_to=""):
+        pass
+
+    monkeypatch.setattr(mailer, "send_mail", fake_send)
+    first = signed_in.post("/api/share/email", json=dict(EMAIL, to=["Buyer@Example.com"], name="Rossi SpA"))
+    again = signed_in.post("/api/share/email", json=dict(EMAIL, to=["buyer@example.com"]))
+
+    assert first.status_code == 200 and again.status_code == 200
+    assert saved(fake_db, "email") == [("priya", "buyer@example.com", "Rossi SpA")]
+    assert signed_in.get("/api/email-contacts").json()["data"] == [{"name": "Rossi SpA", "email": "buyer@example.com"}]
+
+
+def test_a_failed_email_does_not_save_the_address(signed_in, fake_db, monkeypatch, use_settings):
+    use_settings(smtp_pass="real-secret")
+
+    async def down(*args, **kwargs):
+        raise mailer.MailSendFailed("Could not reach the mail server.")
+
+    monkeypatch.setattr(mailer, "send_mail", down)
+    assert signed_in.post("/api/share/email", json=EMAIL).status_code == 502
+    assert fake_db.saved_contacts == []
+
+
+def test_a_failed_save_does_not_fail_a_sent_email(signed_in, fake_db, monkeypatch, use_settings):
+    from app.services import saved_contacts
+
+    use_settings(smtp_pass="real-secret")
+
+    async def fake_send(*args, **kwargs):
+        pass
+
+    def broken(*args):
+        raise RuntimeError("database down")
+
+    monkeypatch.setattr(mailer, "send_mail", fake_send)
+    monkeypatch.setattr(saved_contacts, "remember", broken)
+    assert signed_in.post("/api/share/email", json=EMAIL).status_code == 200

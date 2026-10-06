@@ -59,9 +59,6 @@ select{appearance:none;cursor:pointer;padding-right:36px;background-image:url("d
 .seg button:last-child{border-right:0}
 .seg button[aria-pressed="true"]{background:var(--navy);color:#fff}
 .minisort{height:38px;padding:7px 30px 7px 11px;border-radius:9px;font-size:12.5px;width:auto}
-.ttag{font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:2px 7px;border-radius:6px}
-.ttag.direct{background:var(--ok-bg);color:var(--ok)}
-.ttag.indirect{background:#EEF2F8;color:#455066}
 
 .actions{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
 .btn{appearance:none;font-family:var(--sans);font-size:13px;font-weight:600;border-radius:10px;padding:9px 14px;cursor:pointer;border:1px solid var(--border-strong);background:#fff;color:var(--navy);display:inline-flex;align-items:center;gap:6px}
@@ -81,22 +78,45 @@ input[type="email"],input[type="text"],input[type="tel"]{font-family:var(--sans)
 .toast{font-size:12.5px;color:var(--ok);font-weight:600;margin-top:8px;min-height:16px}
 
 .list{display:flex;flex-direction:column;gap:10px;margin-top:14px;margin-bottom:30px}
-.sail{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:15px 17px;display:flex;align-items:center;gap:18px}
-.sail .left{flex:1 1 auto;min-width:0}
-.sail .vessel{font-weight:600;font-size:15px}
-.sail .sub{color:var(--muted-2);font-size:12.5px;margin-top:2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.tag{font-size:11px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:6px;background:#EEF1F6;color:var(--navy)}
-.dest{color:var(--muted);font-weight:500}
-.right{text-align:right;flex:none;display:flex;gap:22px;align-items:center}
-.dt .k{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-2);font-weight:600}
-.dt .v{font-family:var(--display);font-weight:600;font-size:15px;font-variant-numeric:tabular-nums;margin-top:1px}
-.transit{color:var(--muted);font-size:12.5px}
-.soon{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;letter-spacing:.03em;color:var(--signal);background:var(--signal-bg);padding:2px 8px;border-radius:999px}
-.soon i{width:6px;height:6px;border-radius:50%;background:var(--signal)}
-.ttag{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px}
+/* --- Find sailings: compact table (Finder.jsx, SailingRow.jsx) ------------ */
+/* Wider than the other screens so the filter strip fits on one line. */
+#v-finder .wrap{max-width:1180px}
+
+/* One slim strip of filters, Reset at the end. Wraps only when too narrow. */
+.fstrip{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;padding:12px 14px;margin-top:16px}
+.fctl{display:flex;flex-direction:column;gap:4px;flex:1 1 140px;min-width:0}
+.fctl.dates{flex:2 1 270px}
+.fstrip label.lbl{font-size:10.5px}
+.fstrip select,.fstrip input[type="date"]{height:40px;font-size:13.5px;padding:8px 11px;border-radius:10px}
+.fstrip select{padding-right:32px;background-position:right 10px center}
+.fstrip .pair input[type="date"]{flex:1 1 0;min-width:0}
+.resetlink{appearance:none;border:0;background:none;font-family:var(--sans);font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;height:40px;padding:0 4px;margin-left:auto;flex:none}
+.resetlink:hover{color:var(--navy);text-decoration:underline}
+
+/* Toolbar: count, toggles and sort left; the share actions right. */
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;margin-top:12px}
+.tgroup{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tgroup .count{margin-right:4px}
+.tactions{margin-left:auto}
+
+/* The table. Scrolls sideways inside its box, never the page. */
+.sailtable{gap:0}
+.tablebox{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow-x:auto}
+table.sails{width:100%;border-collapse:collapse;min-width:720px;font-size:13.5px}
+table.sails th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-2);font-weight:600;padding:9px 14px;background:#FAFBFD;border-bottom:1px solid var(--border);white-space:nowrap}
+table.sails td{padding:7px 14px;height:48px;border-bottom:1px solid var(--border);vertical-align:middle}
+table.sails tbody tr:last-child td{border-bottom:0}
+table.sails tbody tr:hover td{background:#F7F9FC}
+table.sails .vessel{font-weight:700;color:var(--navy);font-size:14px;line-height:1.3}
+table.sails .sub{color:var(--muted-2);font-size:12px;line-height:1.35}
+table.sails .dest{color:var(--navy);font-weight:500;line-height:1.35}
+table.sails .soon{color:var(--signal);font-size:11.5px;font-weight:600;line-height:1.35}
+table.sails .date{font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.3}
+table.sails .act{text-align:right;white-space:nowrap;width:1%}
+.ttag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;white-space:nowrap}
 .ttag.direct{background:var(--ok-bg);color:var(--ok)}
-.ttag.indirect{background:#EDEAF7;color:#4B3B8F}
-.bookbtn{align-self:center;flex:none}
+.ttag.indirect{background:#EEF1F6;color:var(--muted)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 .empty{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:44px 22px;text-align:center;color:var(--muted)}
 .empty h3{font-family:var(--display);color:var(--navy);margin:0 0 5px;font-size:16px}
@@ -168,8 +188,6 @@ table.q input[type="text"]{height:38px}
 #flash.show{opacity:1}
 
 @media (max-width:600px){
-  .sail{flex-direction:column;align-items:stretch;gap:12px}
-  .right{justify-content:space-between;text-align:left}
   .brand p{display:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -230,3 +248,26 @@ a.btn{text-decoration:none}
 .urow .uact{display:flex;gap:6px;align-items:center;flex:none;margin-left:auto}
 .chip.plain{background:#EEF1F6;color:var(--muted)}
 .btn.danger{background:var(--signal);border-color:var(--signal);color:#fff}
+
+/* Rate summary (components/Rates.jsx): enquiries down the side, forwarders
+   across the top. The table scrolls sideways inside its panel, never the page. */
+.ratewrap{padding:6px 0;overflow-x:auto}
+table.rates{margin-top:0;min-width:520px}
+table.rates th,table.rates td{vertical-align:top}
+table.rates thead th{white-space:nowrap;padding-top:10px}
+table.rates th.enq{text-align:left;font-weight:400;text-transform:none;letter-spacing:0;font-size:13.5px;color:var(--navy);min-width:190px;padding:10px 12px;position:sticky;left:0;background:var(--card);border-bottom:1px solid var(--border)}
+table.rates thead th:first-child{position:sticky;left:0;background:var(--card);padding-left:12px}
+table.rates .ref{font-family:var(--display);font-weight:700;font-size:14px}
+table.rates .rt{font-size:12px;color:var(--muted);margin-top:1px}
+table.rates td{min-width:150px}
+table.rates td.na{color:var(--muted-2);text-align:center;padding-top:16px}
+.ratecell input[type="text"]{height:38px;font-size:13.5px;padding:8px 10px}
+.ratecell .st{display:block;font-size:11px;color:var(--muted-2);min-height:15px;margin-top:2px}
+.ratecell.saved .st{color:var(--ok)}
+.ratecell.error .st{color:var(--signal)}
+
+/* WhatsApp share: the number box with "Pick from contacts" beside it (the
+   button only exists where the phone's contact picker does). */
+.pickrow{display:flex;gap:8px;align-items:stretch}
+.pickrow input{flex:1 1 auto;min-width:0}
+.pickrow .btn{flex:none;white-space:nowrap}

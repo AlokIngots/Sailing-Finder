@@ -46,8 +46,10 @@ class FakeDb:
         #: rows through and shapes them.
         self.rows: list[dict] = []
         self.queries: list[tuple[str, object]] = []
-        #: (name, number) in insertion order — services/wa_contacts.
-        self.wa_contacts: list[tuple[str, str]] = []
+        #: services/saved_contacts rows: {username, kind, value, name, used}.
+        #: `used` is a counter standing in for last_used_at.
+        self.saved_contacts: list[dict] = []
+        self._clock = 0
 
     # --- helpers used by tests ---
     def add_user(self, username, password_hash, name="", role="user", is_active=True) -> dict:
@@ -128,8 +130,20 @@ class FakeDb:
 
     def fetch_all(self, sql: str, params=()):
         self.queries.append((sql, params))
-        if "FROM wa_contacts" in sql:
-            return [{"name": n, "number": num} for n, num in self.wa_contacts]
+        if "FROM saved_contacts" in sql:
+            if "username = %s" in sql:
+                kind, username, _limit = params
+                rows = [c for c in self.saved_contacts if c["kind"] == kind and c["username"] == username]
+            else:
+                # Admin: everyone's, one entry per value (the latest).
+                kind, _limit = params
+                latest: dict[str, dict] = {}
+                for c in self.saved_contacts:
+                    if c["kind"] == kind and (c["value"] not in latest or c["used"] > latest[c["value"]]["used"]):
+                        latest[c["value"]] = c
+                rows = list(latest.values())
+            rows.sort(key=lambda c: c["used"], reverse=True)
+            return [{"name": c["name"], "value": c["value"]} for c in rows]
         if "FROM users" in sql:
             # services/users.list_active
             active = [u for u in self.users.values() if u["is_active"]]
@@ -137,12 +151,19 @@ class FakeDb:
         return list(self.rows)
 
     def execute(self, sql: str, params=()) -> int:
-        if "INSERT INTO wa_contacts" in sql:
-            # ON CONFLICT (number) DO NOTHING
-            name, number = params
-            if any(num == number for _, num in self.wa_contacts):
-                return 0
-            self.wa_contacts.append((name, number))
+        if "INSERT INTO saved_contacts" in sql:
+            # ON CONFLICT (username, kind, value): bump last_used_at, keep the
+            # old name unless a new one came with it.
+            username, kind, value, name = params
+            self._clock += 1
+            for c in self.saved_contacts:
+                if (c["username"], c["kind"], c["value"]) == (username, kind, value):
+                    c["used"] = self._clock
+                    c["name"] = name or c["name"]
+                    return 1
+            self.saved_contacts.append(
+                {"username": username, "kind": kind, "value": value, "name": name, "used": self._clock}
+            )
             return 1
 
         if "INSERT INTO sessions" in sql:

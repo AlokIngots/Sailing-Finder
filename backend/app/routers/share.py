@@ -25,7 +25,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from app import db
 from app.deps import CurrentUser, require_auth
 from app.routers.schedule import build_schedule_query, shape
-from app.services import mailer, pdf, share_text, shared_pdfs, wa_contacts, whatsapp
+from app.services import mailer, pdf, saved_contacts, share_text, shared_pdfs, whatsapp
 
 log = logging.getLogger(__name__)
 
@@ -66,14 +66,26 @@ class EmailIn(BaseModel):
     to: list[EmailStr] = Field(min_length=1, max_length=MAX_RECIPIENTS)
     subject: str = Field(default="", max_length=300)
     note: str = Field(default="", max_length=2000)
+    #: Optional contact name, saved with the address when there is one recipient.
+    name: str = Field(default="", max_length=120)
     filters: Filters
 
 
 class WhatsAppIn(BaseModel):
     number: str = Field(min_length=6, max_length=20)
-    save: bool = False
+    #: Optional contact name, saved with the number.
     name: str = Field(default="", max_length=120)
     filters: Filters
+
+
+def _remember(user: CurrentUser, kind: str, value: str, name: str) -> None:
+    """Save a recipient to this user's list after a successful send. The
+    message has already gone, so a failure here is logged, never reported as
+    a failed send."""
+    try:
+        saved_contacts.remember(user.username, kind, value, name)
+    except Exception:  # noqa: BLE001 - logged; the send itself succeeded
+        log.exception("could not save %s contact for %r", kind, user.username)
 
 
 def _rows(filters: Filters) -> list[dict]:
@@ -133,6 +145,9 @@ async def share_email(body: EmailIn, user: CurrentUser = Depends(require_auth)) 
         except mailer.MailSendFailed as exc:
             failed.append((address, str(exc)))
 
+    for address in sent:
+        _remember(user, saved_contacts.EMAIL, address, body.name if len(sent) == 1 else "")
+
     log.info("share/email by %r: %d sent, %d failed, %d sailings", user.username, len(sent), len(failed), len(rows))
     if failed and not sent:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, failed[0][1])
@@ -145,8 +160,8 @@ async def share_email(body: EmailIn, user: CurrentUser = Depends(require_auth)) 
 
 @router.post("/share/whatsapp")
 async def share_whatsapp(body: WhatsAppIn, user: CurrentUser = Depends(require_auth)) -> dict:
-    """Interakt template message carrying the schedule PDF. With `save`, the
-    number is remembered once the send has gone through — as in the reference."""
+    """Interakt template message carrying the schedule PDF. The number is saved
+    to this user's list once the send has gone through."""
     digits = whatsapp.normalise_number(body.number)
     if not digits:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Please enter a valid WhatsApp number.")
@@ -168,8 +183,7 @@ async def share_whatsapp(body: WhatsAppIn, user: CurrentUser = Depends(require_a
     except whatsapp.WhatsAppSendFailed as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from None
 
-    if body.save:
-        wa_contacts.save(body.name, digits)
+    _remember(user, saved_contacts.WA, digits, body.name)
 
     log.info("share/whatsapp by %r to +%s, %d sailings", user.username, digits, len(rows))
     return {"status": "ok", "data": {"to": f"+{digits}", "count": len(rows)}, "message": f"Sent to +{digits}"}

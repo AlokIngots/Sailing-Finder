@@ -55,17 +55,26 @@ def tidy_vessel(sailing: dict) -> tuple[str, str]:
     return vessel or raw, voyage
 
 
-def build(sailing: dict, fields) -> tuple[str, str]:
-    """(subject, body) for a shaped sailing (routers.schedule.shape) and the
-    enquiry form (routers.bookings.EnquiryIn)."""
-    vessel, voyage = tidy_vessel(sailing)
+def destination(sailing: dict) -> str:
+    """'Genoa, Italy' — the port of discharge, with its country when known."""
     port = sailing.get("pod_name") or sailing.get("pod_code") or ""
-    where = f"{port}, {sailing['country']}" if sailing.get("country") else port
+    return f"{port}, {sailing['country']}" if sailing.get("country") else port
+
+
+def subject(ref: str, sailing: dict) -> str:
+    """'Rate Enquiry ENQ-0001 — Nhava Sheva to Genoa, Italy'. The ref is how a
+    forwarder's reply is matched back to its enquiry, so it is always here."""
+    return f"Rate Enquiry {ref} — {settings.enquiry_origin_port} to {destination(sailing)}"
+
+
+def build(sailing: dict, fields, ref: str) -> tuple[str, str]:
+    """(subject, body) for a shaped sailing (routers.schedule.shape), the
+    enquiry form (routers.bookings.EnquiryIn) and the enquiry's ref."""
+    vessel, voyage = tidy_vessel(sailing)
+    where = destination(sailing)
     origin = origin_label()
     transit = sailing.get("transit_days")
     carrier = sailing.get("carrier") or ""
-
-    subject = f"Booking request — {origin} to {where} ({carrier} {vessel})"
 
     lines = [
         "We would like to book the shipment below. Please send your best all-in rate "
@@ -97,4 +106,4 @@ def build(sailing: dict, fields) -> tuple[str, str]:
         "Export Team",
         "Alok Ingots (Mumbai) Pvt. Ltd.",
     ]
-    return subject, "\n".join(lines)
+    return subject(ref, sailing), "\n".join(lines)

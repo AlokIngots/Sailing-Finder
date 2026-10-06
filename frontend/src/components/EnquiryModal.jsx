@@ -155,11 +155,12 @@ export default function EnquiryModal({ sailing, onClose, flash }) {
       const result = await api.enquiry({ row_key: sailing.row_key, ...fields, forwarder_ids: chosenIds });
       onClose();
       const failed = (result && result.failed) || [];
-      flash(
-        failed.length
-          ? `Booking request sent to ${result.sent.join(', ')} — not sent to ${failed.join(', ')}.`
-          : 'Booking request sent to the forwarders.',
-      );
+      let message = failed.length
+        ? `Enquiry ${result.ref} sent to ${result.sent.join(', ')} — not sent to ${failed.join(', ')}.`
+        : `Enquiry ${result.ref} sent to ${result.sent.join(', ')}.`;
+      // The emails went, but the rate summary missed it: keep the number.
+      if (result.saved === false) message += ` It could not be saved to the rate summary — note ${result.ref}.`;
+      flash(message);
     } catch (err) {
       setToast(`Could not send: ${err.message}`);
     } finally {

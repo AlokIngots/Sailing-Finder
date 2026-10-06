@@ -80,6 +80,14 @@ export const api = {
   createUser: (payload) => request('/users', { method: 'POST', body: payload }),
   removeUser: (username) => request(`/users/${encodeURIComponent(username)}`, { method: 'DELETE' }),
 
+  // --- rate summary: every enquiry with a free-text rate per forwarder ---
+  enquiries: (signal) => request('/enquiries', { signal }),
+  saveRate: (ref, quoteId, rate) =>
+    request(`/enquiries/${encodeURIComponent(ref)}/quotes/${encodeURIComponent(quoteId)}`, {
+      method: 'PATCH',
+      body: { quoted_rate: rate },
+    }),
+
   // --- everything below arrives with its own feature branch ---
   forwarders: () => request('/forwarders'),
   enquiryOrigin: () => request('/enquiry-origin'),
@@ -95,8 +103,11 @@ export const api = {
   shareEmail: (payload) => request('/share/email', { method: 'POST', body: payload }),
   shareWhatsApp: (payload) => request('/share/whatsapp', { method: 'POST', body: payload }),
 
+  // Each user's own saved recipients, most recently used first (admin: everyone's).
   waContacts: () => request('/wa-contacts'),
   saveWaContact: (payload) => request('/wa-contacts', { method: 'POST', body: payload }),
+  emailContacts: () => request('/email-contacts'),
+  saveEmailContact: (payload) => request('/email-contacts', { method: 'POST', body: payload }),
 };
 
 export default api;

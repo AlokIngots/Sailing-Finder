@@ -19,7 +19,7 @@ from app import db
 from app.config import MAX_FORWARDERS, settings
 from app.deps import CurrentUser, require_auth
 from app.routers.schedule import COLUMNS, shape
-from app.services import enquiry_email, mailer
+from app.services import enquiries, enquiry_email, mailer
 
 log = logging.getLogger(__name__)
 
@@ -96,7 +96,9 @@ async def create_enquiry(body: EnquiryIn, user: CurrentUser = Depends(require_au
     One message per forwarder: To its main address, CC its own colleagues only.
     Never one email with several forwarders on it, and never CC/BCC between them.
 
-    Logging the booking at stage=sent arrives with the bookings list.
+    Each enquiry gets a new number (ENQ-0001, ...) that goes in every subject,
+    and is saved — with the forwarders it reached — for the rate summary
+    (routers/enquiries.py).
     """
     if not settings.forwarders:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "No forwarders are set up yet.")
@@ -124,19 +126,37 @@ async def create_enquiry(body: EnquiryIn, user: CurrentUser = Depends(require_au
             "That sailing is no longer in the schedule. Refresh the list and pick it again.",
         )
 
-    subject, text = enquiry_email.build(shape(row), body)
+    sailing = shape(row)
+    ref = enquiries.next_ref()
+    subject, text = enquiry_email.build(sailing, body, ref)
     results = await mailer.send_to_forwarders_separately(forwarders, subject, lambda _f: text)
 
-    sent = [f.name for f, error in results if error is None]
+    reached = [f for f, error in results if error is None]
+    sent = [f.name for f in reached]
     failed = [(f.name, error) for f, error in results if error is not None]
-    log.info("enquiry by %r for %s: %d sent, %d failed", user.username, body.row_key, len(sent), len(failed))
+    log.info("enquiry %s by %r for %s: %d sent, %d failed", ref, user.username, body.row_key, len(sent), len(failed))
     if not sent:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, failed[0][1])
 
-    message = f"Enquiry sent to {', '.join(sent)}"
+    message = f"{ref} sent to {', '.join(sent)}"
     if failed:
         message += f" — not sent to {', '.join(name for name, _ in failed)}"
-    return {"status": "ok", "data": {"sent": sent, "failed": [name for name, _ in failed]}, "message": message}
+
+    # The emails have gone. If saving fails now, say so rather than answer an
+    # error — an operator who sees an error would send them all again.
+    saved = True
+    try:
+        enquiries.record(ref, sailing, body, user.username, reached)
+    except Exception:  # noqa: BLE001 - logged, and the operator is told
+        log.exception("enquiry %s was emailed but could not be saved", ref)
+        saved = False
+        message += f". It could not be saved to the rate summary — note the number {ref}."
+
+    return {
+        "status": "ok",
+        "data": {"ref": ref, "sent": sent, "failed": [name for name, _ in failed], "saved": saved},
+        "message": message,
+    }
 
 
 @router.post("/bookings/{ref}/quotes")

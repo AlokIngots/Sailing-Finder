@@ -8,8 +8,9 @@ import SailingRow from './SailingRow.jsx';
 /**
  * Find sailings — the #v-finder view of reference/Index.html.
  *
- * Markup and class names follow the reference one-for-one; app.css carries its
- * styles unchanged. Filtering and sorting are done by the server, not here:
+ * Laid out as a compact table: one slim filter strip, a toolbar (count, the
+ * toggles and sort on the left; the share actions on the right), then one
+ * sailing per table row (SailingRow.jsx). Filtering and sorting are done by the server, not here:
  * the share-by-email and WhatsApp endpoints rebuild the same list to attach it
  * to a PDF, so the rules live in one place, app/routers/schedule.py. This
  * component owns the filter *state* and nothing else.
@@ -43,6 +44,20 @@ const SORTS = [
   { value: 'transit', label: 'Fastest transit' },
   { value: 'eta', label: 'Soonest arrival' },
 ];
+
+/**
+ * The phone's contact picker (Contact Picker API) — Android Chrome over HTTPS
+ * only. Everywhere else the button is not shown at all.
+ */
+const CAN_PICK_CONTACTS =
+  typeof navigator !== 'undefined' &&
+  Boolean(navigator.contacts) &&
+  typeof navigator.contacts.select === 'function';
+
+/** A picked phone number without spaces, brackets, dashes or dots. A leading + stays. */
+function tidyPickedNumber(tel) {
+  return String(tel || '').replace(/[\s()\-.]/g, '');
+}
 
 /** The reference's `.seg` group: two or three mutually exclusive choices. */
 function Seg({ label, options, value, onChange }) {
@@ -80,12 +95,16 @@ export default function Finder({ flash }) {
 
   // Which share box is open under the action bar: '', 'email' or 'wa'.
   const [box, setBox] = useState('');
+  // The share boxes start empty, every time; saved recipients come from the
+  // user's own list on the server, most recently used first.
   const [mailTo, setMailTo] = useState('');
   const [mailToast, setMailToast] = useState('');
+  const [mailContacts, setMailContacts] = useState([]);
+  const [mailSelect, setMailSelect] = useState('');
+  const [mailName, setMailName] = useState('');
   const [waContacts, setWaContacts] = useState([]);
   const [waSelect, setWaSelect] = useState('');
   const [waManual, setWaManual] = useState('');
-  const [waRemember, setWaRemember] = useState(false);
   const [waName, setWaName] = useState('');
 
   const [enquiring, setEnquiring] = useState(null);
@@ -161,24 +180,63 @@ export default function Finder({ flash }) {
     flash('Downloaded — opens in Excel.');
   }
 
-  function openWhatsApp() {
-    setBox('wa');
+  function loadWaContacts() {
     api
       .waContacts()
       .then((list) => setWaContacts(Array.isArray(list) ? list : []))
       .catch(() => setWaContacts([]));
   }
 
+  function loadMailContacts() {
+    api
+      .emailContacts()
+      .then((list) => setMailContacts(Array.isArray(list) ? list : []))
+      .catch(() => setMailContacts([]));
+  }
+
+  function openWhatsApp() {
+    setBox('wa');
+    loadWaContacts();
+  }
+
+  function openEmail() {
+    setBox('email');
+    loadMailContacts();
+  }
+
+  /** Fill the number (and its name) from the phone's contacts. Cancelled or
+   *  failed: nothing changes and the operator types it instead. */
+  async function pickContact() {
+    try {
+      const [contact] = (await navigator.contacts.select(['name', 'tel'], { multiple: false })) || [];
+      const tel = contact && (contact.tel || []).find(Boolean);
+      if (!tel) return;
+      setWaManual(tidyPickedNumber(tel));
+      setWaSelect('');
+      setWaName(((contact.name || []).find(Boolean) || '').trim());
+    } catch {
+      // Picker unavailable, denied or dismissed.
+    }
+  }
+
   async function sendMail() {
-    const to = mailTo.trim();
+    const to = mailTo.trim() || mailSelect.trim();
     if (!to) {
       setMailToast('Enter an email address first.');
       return;
     }
     setMailToast('Sending…');
     try {
-      await api.shareEmail({ to: [to], subject: '', note: '', filters: query });
+      await api.shareEmail({
+        to: [to],
+        subject: '',
+        note: '',
+        name: mailTo.trim() ? mailName.trim() : '',
+        filters: query,
+      });
       setMailToast(`Email sent to ${to}`);
+      // The server saved it to this user's list; show it at the top.
+      loadMailContacts();
     } catch (err) {
       setMailToast(`Could not send: ${err.message}`);
     }
@@ -198,8 +256,7 @@ export default function Finder({ flash }) {
     try {
       await api.shareWhatsApp({
         number,
-        save: Boolean(waManual.trim()) && waRemember,
-        name: waName.trim(),
+        name: waManual.trim() ? waName.trim() : '',
         filters: query,
       });
       flash(`Sent to ${number}`);
@@ -214,103 +271,101 @@ export default function Finder({ flash }) {
   return (
     <div className="view active" id="v-finder">
       <div className="wrap">
-        <div className="panel">
-          <div className="row">
-            <div className="control">
-              <label className="lbl" htmlFor="country">Country</label>
-              <select id="country" value={filters.country} onChange={(e) => setFilter('country', e.target.value)}>
-                <option value="">All countries</option>
-                {options.countries.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="control">
-              <label className="lbl" htmlFor="dest">Port</label>
-              <select id="dest" value={filters.pod_code} onChange={(e) => setFilter('pod_code', e.target.value)}>
-                <option value="">{portLabel}</option>
-                {options.ports.map((p) => (
-                  <option key={p.code} value={p.code}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="control">
-              <label className="lbl" htmlFor="car">Carrier</label>
-              <select id="car" value={filters.carrier} onChange={(e) => setFilter('carrier', e.target.value)}>
-                <option value="">All carriers</option>
-                {options.carriers.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+        {/* One slim strip: every filter on a line, Reset at the end. Wraps
+            only when the screen is too narrow to hold it. */}
+        <div className="panel fstrip">
+          <div className="fctl">
+            <label className="lbl" htmlFor="country">Country</label>
+            <select id="country" value={filters.country} onChange={(e) => setFilter('country', e.target.value)}>
+              <option value="">All countries</option>
+              {options.countries.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="fctl">
+            <label className="lbl" htmlFor="dest">Port</label>
+            <select id="dest" value={filters.pod_code} onChange={(e) => setFilter('pod_code', e.target.value)}>
+              <option value="">{portLabel}</option>
+              {options.ports.map((p) => (
+                <option key={p.code} value={p.code}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="fctl">
+            <label className="lbl" htmlFor="car">Carrier</label>
+            <select id="car" value={filters.carrier} onChange={(e) => setFilter('carrier', e.target.value)}>
+              <option value="">All carriers</option>
+              {options.carriers.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="fctl dates">
+            <label className="lbl">Departs between</label>
+            <div className="pair">
+              <input type="date" aria-label="Departs from" value={filters.etd_from} onChange={(e) => setFilter('etd_from', e.target.value)} />
+              <span>to</span>
+              <input type="date" aria-label="Departs to" value={filters.etd_to} onChange={(e) => setFilter('etd_to', e.target.value)} />
             </div>
           </div>
-          <div className="row">
-            <div className="control dates">
-              <label className="lbl">Departs between</label>
-              <div className="pair">
-                <input type="date" aria-label="Departs from" value={filters.etd_from} onChange={(e) => setFilter('etd_from', e.target.value)} />
-                <span>to</span>
-                <input type="date" aria-label="Departs to" value={filters.etd_to} onChange={(e) => setFilter('etd_to', e.target.value)} />
-              </div>
-            </div>
-            <div className="control dates">
-              <label className="lbl">Arrives between</label>
-              <div className="pair">
-                <input type="date" aria-label="Arrives from" value={filters.eta_from} onChange={(e) => setFilter('eta_from', e.target.value)} />
-                <span>to</span>
-                <input type="date" aria-label="Arrives to" value={filters.eta_to} onChange={(e) => setFilter('eta_to', e.target.value)} />
-              </div>
+          <div className="fctl dates">
+            <label className="lbl">Arrives between</label>
+            <div className="pair">
+              <input type="date" aria-label="Arrives from" value={filters.eta_from} onChange={(e) => setFilter('eta_from', e.target.value)} />
+              <span>to</span>
+              <input type="date" aria-label="Arrives to" value={filters.eta_to} onChange={(e) => setFilter('eta_to', e.target.value)} />
             </div>
           </div>
-        </div>
-
-        <div className="bar">
-          <div className="count" aria-live="polite">
-            {count === null ? (
-              '—'
-            ) : (
-              <>
-                <b>{count}</b> sailing{count === 1 ? '' : 's'}
-                {mode === 'next_per_port' ? ' (next per port)' : ''}
-                {truncated ? ' (first 2000 — narrow the filters)' : ''}
-              </>
-            )}
-          </div>
-          <div className="spacer" />
-          <Seg label="Shipment type" options={ROUTING} value={routing} onChange={setRouting} />
-          <Seg label="View" options={MODE} value={mode} onChange={setMode} />
-          <select className="minisort" aria-label="Sort by" value={sort} onChange={(e) => setSort(e.target.value)}>
-            {SORTS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="actions internal">
-          <button type="button" className="btn ghost" onClick={reset}>
+          {/* .internal as before: Reset was in the internal action row. */}
+          <button type="button" className="resetlink internal" onClick={reset}>
             Reset
           </button>
-          <div className="spacer" />
-          <button type="button" className="btn" onClick={onCopy}>
-            Copy list
-          </button>
-          <button type="button" className="btn" onClick={onDownload}>
-            Download
-          </button>
-          <button type="button" className="btn wa" onClick={openWhatsApp}>
-            WhatsApp
-          </button>
-          <button type="button" className="btn primary" onClick={() => setBox('email')}>
-            Email these
-          </button>
+        </div>
+
+        <div className="toolbar">
+          <div className="tgroup">
+            <div className="count" aria-live="polite">
+              {count === null ? (
+                '—'
+              ) : (
+                <>
+                  <b>{count}</b> sailing{count === 1 ? '' : 's'}
+                  {mode === 'next_per_port' ? ' (next per port)' : ''}
+                  {truncated ? ' (first 2000 — narrow the filters)' : ''}
+                </>
+              )}
+            </div>
+            <Seg label="Shipment type" options={ROUTING} value={routing} onChange={setRouting} />
+            <Seg label="View" options={MODE} value={mode} onChange={setMode} />
+            <select className="minisort" aria-label="Sort by" value={sort} onChange={(e) => setSort(e.target.value)}>
+              {SORTS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="tgroup tactions internal">
+            <button type="button" className="btn" onClick={onCopy}>
+              Copy list
+            </button>
+            <button type="button" className="btn" onClick={onDownload}>
+              Download
+            </button>
+            <button type="button" className="btn wa" onClick={openWhatsApp}>
+              WhatsApp
+            </button>
+            <button type="button" className="btn primary" onClick={openEmail}>
+              Email these
+            </button>
+          </div>
         </div>
 
         {box === 'email' ? (
@@ -318,9 +373,49 @@ export default function Finder({ flash }) {
             <h4>Email these sailings</h4>
             <div className="mailrow">
               <div className="control">
-                <label className="lbl" htmlFor="to">Send to</label>
-                <input type="email" id="to" placeholder="name@company.com" autoComplete="off" autoFocus value={mailTo} onChange={(e) => setMailTo(e.target.value)} />
+                <label className="lbl" htmlFor="mailSelect">Saved emails</label>
+                <select
+                  id="mailSelect"
+                  value={mailSelect}
+                  onChange={(e) => {
+                    setMailSelect(e.target.value);
+                    if (e.target.value) setMailTo('');
+                  }}
+                >
+                  <option value="">{mailContacts.length ? '— choose a saved email —' : 'No saved emails yet'}</option>
+                  {mailContacts.map((c) => (
+                    <option key={c.email} value={c.email}>
+                      {c.name ? `${c.name} — ` : ''}
+                      {c.email}
+                    </option>
+                  ))}
+                </select>
               </div>
+              <div className="control">
+                <label className="lbl" htmlFor="to">Or type a new email</label>
+                <input
+                  type="email"
+                  id="to"
+                  placeholder="Enter email address"
+                  autoComplete="off"
+                  autoFocus
+                  value={mailTo}
+                  onChange={(e) => {
+                    setMailTo(e.target.value);
+                    if (e.target.value) setMailSelect('');
+                  }}
+                />
+              </div>
+            </div>
+            {mailTo.trim() ? (
+              <div className="mailrow">
+                <div className="control">
+                  <label className="lbl" htmlFor="mailName">Contact name (optional)</label>
+                  <input type="text" id="mailName" placeholder="Saved with the address" autoComplete="off" value={mailName} onChange={(e) => setMailName(e.target.value)} />
+                </div>
+              </div>
+            ) : null}
+            <div className="mailrow">
               <button type="button" className="btn primary" onClick={sendMail}>
                 Send email
               </button>
@@ -332,7 +427,7 @@ export default function Finder({ flash }) {
               </button>
             </div>
             <div className="toast" role="status">{mailToast}</div>
-            <div className="hint">Send emails the sailing list directly from our account — one click, no email app.</div>
+            <div className="hint">Send emails the sailing list directly from our account — one click, no email app. New addresses are saved to your list.</div>
           </div>
         ) : null}
 
@@ -350,7 +445,7 @@ export default function Finder({ flash }) {
                     if (e.target.value) setWaManual('');
                   }}
                 >
-                  <option value="">— choose a saved number —</option>
+                  <option value="">{waContacts.length ? '— choose a saved number —' : 'No saved numbers yet'}</option>
                   {waContacts.map((c) => (
                     <option key={c.number} value={c.number}>
                       {c.name ? `${c.name} — ` : ''}
@@ -361,16 +456,32 @@ export default function Finder({ flash }) {
               </div>
               <div className="control">
                 <label className="lbl" htmlFor="waManual">Or type a new number</label>
-                <input type="tel" id="waManual" placeholder="98672 00083" autoComplete="off" autoFocus value={waManual} onChange={(e) => setWaManual(e.target.value)} />
+                <div className="pickrow">
+                  <input
+                    type="tel"
+                    id="waManual"
+                    placeholder="Enter WhatsApp number"
+                    autoComplete="off"
+                    autoFocus
+                    value={waManual}
+                    onChange={(e) => {
+                      setWaManual(e.target.value);
+                      if (e.target.value) setWaSelect('');
+                    }}
+                  />
+                  {CAN_PICK_CONTACTS ? (
+                    <button type="button" className="btn" onClick={pickContact}>
+                      Pick from contacts
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
             {waManual.trim() ? (
               <div className="mailrow">
-                <label className="lbl" style={{ display: 'flex', alignItems: 'center', gap: 6, textTransform: 'none', fontSize: 13 }}>
-                  <input type="checkbox" style={{ width: 'auto', height: 'auto' }} checked={waRemember} onChange={(e) => setWaRemember(e.target.checked)} /> Remember this number
-                </label>
                 <div className="control">
-                  <input type="text" placeholder="Name / label (optional)" autoComplete="off" value={waName} onChange={(e) => setWaName(e.target.value)} />
+                  <label className="lbl" htmlFor="waName">Contact name (optional)</label>
+                  <input type="text" id="waName" placeholder="Saved with the number" autoComplete="off" value={waName} onChange={(e) => setWaName(e.target.value)} />
                 </div>
               </div>
             ) : null}
@@ -385,11 +496,11 @@ export default function Finder({ flash }) {
                 Close
               </button>
             </div>
-            <div className="hint">Applies the filters above, makes a PDF of those sailings, and sends it to the WhatsApp number with a short note.</div>
+            <div className="hint">Applies the filters above, makes a PDF of those sailings, and sends it to the WhatsApp number with a short note. New numbers are saved to your list.</div>
           </div>
         ) : null}
 
-        <div className="list">
+        <div className="list sailtable">
           {loadError ? (
             <div className="empty failed" role="alert">
               <h3>Couldn&apos;t load sailings</h3>
@@ -403,9 +514,31 @@ export default function Finder({ flash }) {
               <h3>No sailings match</h3>
               <div>Try a different country, port, carrier or date range.</div>
             </div>
-          ) : (
-            sailings.map((sailing) => <SailingRow key={sailing.row_key} sailing={sailing} onEnquire={setEnquiring} />)
-          )}
+          ) : sailings.length ? (
+            // Scrolls sideways inside its own box on a narrow screen, so the
+            // page itself never does.
+            <div className="tablebox">
+              <table className="sails">
+                <thead>
+                  <tr>
+                    <th scope="col">Vessel</th>
+                    <th scope="col">Destination</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Departs</th>
+                    <th scope="col">Arrives</th>
+                    <th scope="col" className="act internal">
+                      <span className="sr-only">Enquire</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sailings.map((sailing) => (
+                    <SailingRow key={sailing.row_key} sailing={sailing} onEnquire={setEnquiring} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
         <div className="foot">Carrier estimates — confirm cut-offs before booking.</div>
       </div>

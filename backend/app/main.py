@@ -22,7 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import config, db
 from app.config import settings
-from app.routers import auth, bookings, schedule, share, users, wa_contacts
+from app.routers import auth, bookings, enquiries, schedule, share, users, wa_contacts
 
 logging.basicConfig(
     level=logging.INFO,
@@ -110,6 +110,7 @@ def healthz():
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(schedule.router, prefix="/api", tags=["schedule"])
 app.include_router(bookings.router, prefix="/api", tags=["bookings"])
+app.include_router(enquiries.router, prefix="/api", tags=["enquiries"])
 app.include_router(share.router, prefix="/api", tags=["share"])
 app.include_router(wa_contacts.router, prefix="/api", tags=["wa-contacts"])
 app.include_router(users.router, prefix="/api", tags=["users"])
@@ -119,7 +120,7 @@ app.include_router(users.router, prefix="/api", tags=["users"])
 app.include_router(share.public_router)
 
 
-@app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False)
+@app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
 def api_not_found(rest: str):
     """An unknown /api path must never fall through to index.html, or the
     frontend gets HTML where it expected JSON."""

@@ -5,6 +5,7 @@ import api from './api.js';
 import Bookings from './components/Bookings.jsx';
 import Finder from './components/Finder.jsx';
 import Login from './components/Login.jsx';
+import Rates from './components/Rates.jsx';
 import Shipment from './components/Shipment.jsx';
 import Users from './components/Users.jsx';
 
@@ -108,7 +109,8 @@ export default function App() {
   const isAdmin = user.role === 'admin';
   const onBookings = pathname.startsWith('/bookings');
   const onUsers = pathname === '/users';
-  const onFinder = !onBookings && !onUsers;
+  const onRates = pathname === '/rates';
+  const onFinder = !onBookings && !onUsers && !onRates;
 
   function go(path) {
     navigate(path);
@@ -132,6 +134,15 @@ export default function App() {
             </button>
             <button type="button" aria-current={onBookings ? 'true' : 'false'} onClick={() => go('/bookings')}>
               My bookings <span className="badge">{bookingCount}</span>
+            </button>
+            {/* Internal (rates are not for a customer's eyes), so Customer view hides it. */}
+            <button
+              type="button"
+              className="internal"
+              aria-current={onRates ? 'true' : 'false'}
+              onClick={() => go('/rates')}
+            >
+              Rate summary
             </button>
             {/* Admin only, and an internal tool, so Customer view hides it. */}
             {isAdmin ? (
@@ -166,6 +177,7 @@ export default function App() {
         <Route path="/" element={<Finder flash={flash} />} />
         <Route path="/bookings" element={<Bookings />} />
         <Route path="/bookings/:ref" element={<Shipment />} />
+        <Route path="/rates" element={<Rates flash={flash} isAdmin={isAdmin} />} />
         {/* A non-admin typing /users falls through to the redirect below; the
             API behind the screen answers them 403 regardless. */}
         {isAdmin ? <Route path="/users" element={<Users flash={flash} />} /> : null}
