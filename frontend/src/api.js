@@ -54,11 +54,18 @@ async function request(path, { method = 'GET', body, signal } = {}) {
   return payload.data;
 }
 
-/** Drop empty values so the server sees an absent filter, not a blank one. */
+/** Drop empty values so the server sees an absent filter, not a blank one.
+ *  An array (several countries or ports) becomes one repeated key per value. */
 function queryString(params) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params || {})) {
-    if (value !== undefined && value !== null && value !== '') search.set(key, value);
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item !== undefined && item !== null && item !== '') search.append(key, item);
+      }
+    } else if (value !== undefined && value !== null && value !== '') {
+      search.set(key, value);
+    }
   }
   const query = search.toString();
   return query ? `?${query}` : '';
@@ -72,8 +79,9 @@ export const api = {
 
   // --- finder ---
   schedule: (filters, signal) => request(`/schedule${queryString(filters)}`, { signal }),
-  scheduleFilters: (country, signal) =>
-    request(`/schedule/filters${queryString({ country })}`, { signal }),
+  // Every option, each port with the countries it is in; Finder.jsx narrows
+  // the ports to the chosen countries itself.
+  scheduleFilters: (signal) => request('/schedule/filters', { signal }),
 
   // --- users (admin only; the server answers 403 for anyone else) ---
   users: (signal) => request('/users', { signal }),

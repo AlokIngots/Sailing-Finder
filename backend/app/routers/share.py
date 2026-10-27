@@ -44,7 +44,9 @@ class Filters(BaseModel):
     """The finder's current filter state, so the server rebuilds exactly the
     list the user is looking at rather than trusting rows posted by the browser."""
 
-    country: str | None = None
+    #: Several of each may be chosen; a single string is accepted too.
+    country: list[str] | None = None
+    port: list[str] | None = None
     pod_code: str | None = None
     carrier: str | None = None
     etd_from: date | None = None
@@ -54,6 +56,13 @@ class Filters(BaseModel):
     routing: Literal["all", "direct", "indirect"] = "all"
     mode: Literal["all", "next_per_port"] = "all"
     sort: Literal["etd", "transit", "eta"] = "etd"
+
+    @field_validator("country", "port", mode="before")
+    @classmethod
+    def _one_or_many(cls, value):
+        if value in ("", None):
+            return None
+        return [value] if isinstance(value, str) else value
 
     @field_validator("etd_from", "etd_to", "eta_from", "eta_to", mode="before")
     @classmethod

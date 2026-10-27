@@ -163,6 +163,9 @@ def test_where_label_follows_port_then_country_then_default():
     rows = shaped()
     assert share_text.where_label(Filters(pod_code="nlrtm"), rows) == "Rotterdam, Netherlands"
     assert share_text.where_label(Filters(country="Italy"), rows) == "Italy"
+    assert share_text.where_label(Filters(country=["Italy", "Netherlands"]), rows) == "Italy, Netherlands"
+    assert share_text.where_label(Filters(port=["rotterdam"]), rows) == "Rotterdam, Netherlands"
+    assert share_text.where_label(Filters(port=["Rotterdam", "Genoa"]), rows) == "Rotterdam, Genoa"
     assert share_text.where_label(Filters(), rows) == "Europe & Mediterranean"
 
 
@@ -220,6 +223,16 @@ def test_preview_pdf_works_without_any_keys(signed_in, monkeypatch, use_settings
     assert response.headers["content-type"] == "application/pdf"
     assert response.headers["content-disposition"].startswith('inline; filename="Sailing_Schedule_')
     assert response.content.startswith(b"%PDF-")
+
+
+def test_preview_pdf_takes_several_countries_and_ports(signed_in, fake_db):
+    response = signed_in.get(
+        "/api/share/pdf",
+        params=[("country", "Italy"), ("country", "Netherlands"), ("port", "Genoa"), ("port", "Rotterdam")],
+    )
+    assert response.status_code == 200
+    sql, params = fake_db.queries[-1]
+    assert ["IT%", "NL%"] in params and ["genoa", "rotterdam"] in params
 
 
 def test_preview_rejects_a_bad_date(signed_in):

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import api from '../api.js';
 import { copyText, downloadCsv, toPlainText } from '../lib/exportList.js';
 import EnquiryModal from './EnquiryModal.jsx';
+import MultiSelect from './MultiSelect.jsx';
 import SailingRow from './SailingRow.jsx';
 
 /**
@@ -18,9 +19,12 @@ import SailingRow from './SailingRow.jsx';
  * Copy list and Download act on exactly what is on screen.
  */
 
+// Country and port are multi-select: an empty array means "all". Ports are
+// sent by name — the server matches them by name, the same rule it builds the
+// dropdown with (app/services/ports.py).
 const EMPTY_FILTERS = {
-  country: '',
-  pod_code: '',
+  country: [],
+  port: [],
   carrier: '',
   etd_from: '',
   etd_to: '',
@@ -114,17 +118,37 @@ export default function Finder({ flash }) {
     [filters, routing, mode, sort],
   );
 
-  // --- dropdown options; ports cascade from the chosen country ---------------
+  // --- dropdown options, built by the server from the synced data ----------
   useEffect(() => {
     const controller = new AbortController();
     api
-      .scheduleFilters(filters.country, controller.signal)
+      .scheduleFilters(controller.signal)
       .then(setOptions)
       .catch((err) => {
         if (err.name !== 'AbortError') setLoadError(err.message);
       });
     return () => controller.abort();
-  }, [filters.country, retry]);
+  }, [retry]);
+
+  // Ports cascade from the chosen countries. A port with no known country is
+  // only hidden while a country is chosen — its sailings could not match then.
+  const portNames = useMemo(() => {
+    const ports = options.ports || [];
+    if (!filters.country.length) return ports.map((p) => p.name);
+    const wanted = new Set(filters.country.map((c) => c.toLowerCase()));
+    return ports
+      .filter((p) => (p.countries || []).some((c) => wanted.has(c.toLowerCase())))
+      .map((p) => p.name);
+  }, [options.ports, filters.country]);
+
+  // Drop chosen ports that are no longer offered (a country was un-ticked).
+  useEffect(() => {
+    if (!options.ports.length) return;
+    const offered = new Set(portNames);
+    if (filters.port.some((p) => !offered.has(p))) {
+      setFilters((current) => ({ ...current, port: current.port.filter((p) => offered.has(p)) }));
+    }
+  }, [portNames, filters.port, options.ports.length]);
 
   // --- the list --------------------------------------------------------------
   useEffect(() => {
@@ -149,13 +173,7 @@ export default function Finder({ flash }) {
   }, [query, retry]);
 
   function setFilter(key, value) {
-    setFilters((current) => {
-      const next = { ...current, [key]: value };
-      // Changing country invalidates the chosen port — it may not be in the
-      // new country at all.
-      if (key === 'country') next.pod_code = '';
-      return next;
-    });
+    setFilters((current) => ({ ...current, [key]: value }));
   }
 
   // Same scope as the reference's Reset: filters and Direct/Indirect. The
@@ -266,7 +284,12 @@ export default function Finder({ flash }) {
     }
   }
 
-  const portLabel = filters.country ? `All ports in ${filters.country}` : 'All ports';
+  const portLabel =
+    filters.country.length === 1
+      ? `All ports in ${filters.country[0]}`
+      : filters.country.length
+        ? 'All ports in selected countries'
+        : 'All ports';
 
   return (
     <div className="view active" id="v-finder">
@@ -276,25 +299,27 @@ export default function Finder({ flash }) {
         <div className="panel fstrip">
           <div className="fctl">
             <label className="lbl" htmlFor="country">Country</label>
-            <select id="country" value={filters.country} onChange={(e) => setFilter('country', e.target.value)}>
-              <option value="">All countries</option>
-              {options.countries.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            <MultiSelect
+              id="country"
+              label="Country"
+              allLabel="All countries"
+              noun="countries"
+              options={options.countries}
+              value={filters.country}
+              onChange={(v) => setFilter('country', v)}
+            />
           </div>
           <div className="fctl">
             <label className="lbl" htmlFor="dest">Port</label>
-            <select id="dest" value={filters.pod_code} onChange={(e) => setFilter('pod_code', e.target.value)}>
-              <option value="">{portLabel}</option>
-              {options.ports.map((p) => (
-                <option key={p.code} value={p.code}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <MultiSelect
+              id="dest"
+              label="Port"
+              allLabel={portLabel}
+              noun="ports"
+              options={portNames}
+              value={filters.port}
+              onChange={(v) => setFilter('port', v)}
+            />
           </div>
           <div className="fctl">
             <label className="lbl" htmlFor="car">Carrier</label>

@@ -11,8 +11,9 @@ before attaching it to an email or a PDF — so the rules live here, once.
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from datetime import date
-from typing import Any, Literal
+from typing import Any, Iterable, Literal
 
 from fastapi import APIRouter, Depends, Query
 
@@ -69,9 +70,25 @@ def ship_type(transshipment: str | None) -> str:
     return "direct" if int(raw) == 0 else "indirect"
 
 
+def as_list(value: str | Iterable[str] | None) -> list[str]:
+    """One value or many -> a clean list: trimmed, blanks dropped, and
+    de-duplicated case-insensitively with the first spelling kept."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    seen: dict[str, str] = {}
+    for item in value:
+        text = " ".join(str(item or "").split())
+        if text:
+            seen.setdefault(text.lower(), text)
+    return list(seen.values())
+
+
 def build_schedule_query(
     *,
-    country: str | None = None,
+    country: str | Iterable[str] | None = None,
+    port: str | Iterable[str] | None = None,
     pod_code: str | None = None,
     carrier: str | None = None,
     etd_from: date | None = None,
@@ -91,17 +108,25 @@ def build_schedule_query(
     where: list[str] = ["etd >= CURRENT_DATE"]  # a departed sailing is never useful
     params: list[Any] = []
 
-    if country:
+    countries = as_list(country)
+    if countries:
         # A LOCODE starts with the ISO country code, so a country filter is a
-        # prefix match on the POD. See services/ports.py.
-        iso = ports.iso_for_country(country)
-        if not iso:
-            # Unknown country: match nothing, rather than silently ignoring it
-            # and showing the world.
+        # prefix match on the POD. See services/ports.py. Several countries are
+        # OR'ed together.
+        isos = [iso for iso in (ports.iso_for_country(c) for c in countries) if iso]
+        if not isos:
+            # Only unknown countries: match nothing, rather than silently
+            # ignoring them and showing the world.
             where.append("FALSE")
         else:
-            where.append("upper(pod_code) LIKE %s")
-            params.append(f"{iso}%")
+            where.append("upper(btrim(pod_code)) LIKE ANY(%s::text[])")
+            params.append([f"{iso}%" for iso in dict.fromkeys(isos)])
+
+    port_keys = [ports.port_key(p) for p in as_list(port)]
+    if port_keys:
+        # Ports are matched by name, the same rule the dropdown is built with.
+        where.append(f"{ports.PORT_KEY_SQL} = ANY(%s::text[])")
+        params.append(port_keys)
 
     if pod_code:
         where.append("upper(pod_code) = %s")
@@ -185,7 +210,8 @@ def shape(row: dict) -> dict:
 @router.get("/schedule")
 def get_schedule(
     user: CurrentUser = Depends(require_auth),
-    country: str | None = None,
+    country: list[str] | None = Query(default=None),
+    port: list[str] | None = Query(default=None),
     pod_code: str | None = None,
     carrier: str | None = None,
     etd_from: date | None = None,
@@ -200,6 +226,7 @@ def get_schedule(
     """Filtered sailings, newest departure first unless told otherwise."""
     sql, params = build_schedule_query(
         country=country,
+        port=port,
         pod_code=pod_code,
         carrier=carrier,
         etd_from=etd_from,
@@ -227,44 +254,62 @@ def get_schedule(
 @router.get("/schedule/filters")
 def get_filters(
     user: CurrentUser = Depends(require_auth),
-    country: str | None = None,
+    country: list[str] | None = Query(default=None),
 ) -> dict:
-    """Options for the cascading dropdowns.
+    """Options for the Country, Port and Carrier dropdowns.
 
-    Countries and carriers come from the whole table; ports narrow to the
-    selected country, which is what makes Country -> Port cascade. Options are
-    built from the data that is actually there, so a port with no sailings never
-    appears and then returns nothing.
+    Built every time from the DISTINCT values actually in the schedule table
+    (which is what the Google Sheet syncs into), never from a fixed list: a
+    port added to the sheet appears on the next sync, and one that is removed
+    disappears with its rows. Same `etd >= CURRENT_DATE` scope as the list, so
+    an option never leads to an empty result.
+
+    Each port carries the countries it is in, so the browser can narrow the
+    Port list to the selected countries without another round trip. Passing
+    `country` narrows the ports here too.
     """
     rows = db.fetch_all(
         """
-        SELECT DISTINCT pod_code, pod_name, carrier
+        SELECT pod_code, pod_name, carrier, count(*) AS n
           FROM schedule
          WHERE etd >= CURRENT_DATE
+         GROUP BY pod_code, pod_name, carrier
         """
     )
 
-    iso = ports.iso_for_country(country) if country else ""
+    wanted = {c.lower() for c in as_list(country)}
 
-    seen_ports: dict[str, str] = {}
+    # port key -> how often each spelling is used, and which countries it is in.
+    spellings: dict[str, Counter] = {}
+    port_countries: dict[str, set[str]] = {}
     for row in rows:
-        code = (row["pod_code"] or "").strip().upper()
-        if not code:
+        label = ports.port_label(row["pod_name"], row["pod_code"])
+        if not label:
             continue
-        if iso and not code.startswith(iso):
+        key = ports.port_key(label)
+        spellings.setdefault(key, Counter())[label] += int(row.get("n") or 1)
+        country_name = ports.country_for_port(row["pod_code"])
+        port_countries.setdefault(key, set())
+        if country_name:
+            port_countries[key].add(country_name)
+
+    def readable(counter: Counter) -> str:
+        # Prefer a spelling that is not ALL CAPS, then the most used one.
+        return sorted(counter.items(), key=lambda kv: (kv[0].isupper(), -kv[1], kv[0]))[0][0]
+
+    port_options = []
+    for key, counter in spellings.items():
+        in_countries = sorted(port_countries[key], key=str.lower)
+        if wanted and not any(c.lower() in wanted for c in in_countries):
             continue
-        # First non-empty name wins; codes are the key, so a port cannot appear
-        # twice because one scraper spells its name differently.
-        seen_ports.setdefault(code, (row["pod_name"] or code).strip() or code)
+        port_options.append({"name": readable(counter), "countries": in_countries})
+    port_options.sort(key=lambda p: p["name"].lower())
 
     return {
         "status": "ok",
         "data": {
             "countries": ports.country_options(r["pod_code"] for r in rows),
-            "ports": [
-                {"code": code, "name": name}
-                for code, name in sorted(seen_ports.items(), key=lambda kv: kv[1])
-            ],
+            "ports": port_options,
             "carriers": sorted({(r["carrier"] or "").strip() for r in rows} - {""}),
         },
         "message": "",

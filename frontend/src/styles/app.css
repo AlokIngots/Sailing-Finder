@@ -93,6 +93,23 @@ input[type="email"],input[type="text"],input[type="tel"]{font-family:var(--sans)
 .resetlink{appearance:none;border:0;background:none;font-family:var(--sans);font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;height:40px;padding:0 4px;margin-left:auto;flex:none}
 .resetlink:hover{color:var(--navy);text-decoration:underline}
 
+/* Multi-select (Country, Port): closed it looks like the strip's selects; open
+   it is a checkbox list. On a phone the list is full width with tall rows. */
+.msel{position:relative;width:100%}
+.msel-btn{appearance:none;display:block;text-align:left;font-family:var(--sans);font-size:13.5px;color:var(--muted);background:var(--card);border:1px solid var(--border-strong);border-radius:10px;height:40px;width:100%;padding:8px 32px 8px 11px;cursor:pointer;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235B6473' stroke-width='2'><path d='m6 9 6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 10px center}
+.msel-btn.has{color:var(--navy);font-weight:600}
+.msel-text{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msel-pop{position:absolute;z-index:40;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:min(320px,calc(100vw - 32px));background:var(--card);border:1px solid var(--border-strong);border-radius:12px;box-shadow:0 10px 30px rgba(0,12,46,.14);padding:8px;display:flex;flex-direction:column;gap:6px}
+.msel-search{font-family:var(--sans);font-size:13.5px;color:var(--navy);border:1px solid var(--border-strong);border-radius:9px;padding:8px 10px;width:100%}
+.msel-list{max-height:280px;overflow-y:auto;overscroll-behavior:contain}
+.msel-opt{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;font-size:13.5px;color:var(--navy);cursor:pointer;user-select:none}
+.msel-opt:hover{background:var(--ground)}
+.msel-opt input{width:16px;height:16px;flex:none;accent-color:var(--navy);margin:0}
+.msel-none{padding:10px 8px;font-size:13px;color:var(--muted-2)}
+.msel-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--border);padding-top:6px}
+.msel-foot .resetlink{height:34px;margin-left:0}
+.msel-foot .resetlink:disabled{opacity:.4;cursor:default;text-decoration:none}
+
 /* Toolbar: count, toggles and sort left; the share actions right. */
 .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;margin-top:12px}
 .tgroup{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -302,6 +319,12 @@ table.rates td.na{color:var(--muted-2);text-align:center;padding-top:16px}
   .fctl,.fctl.dates{flex:none;width:100%}
   .fstrip label.lbl{font-size:11px}
   .fstrip select,.fstrip input[type="date"]{height:44px;font-size:16px}
+  .msel-btn{height:44px;font-size:16px}
+  .msel-pop{width:100%;max-width:none}
+  .msel-search{font-size:16px}
+  .msel-opt{padding:12px 10px;font-size:16px}
+  .msel-opt input{width:20px;height:20px}
+  .msel-list{max-height:50vh}
   .resetlink{margin-left:0;align-self:flex-end;height:44px}
 
   /* Toolbar: count, then each toggle and the sort on its own full-width

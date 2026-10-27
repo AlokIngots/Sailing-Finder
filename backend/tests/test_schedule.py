@@ -57,7 +57,7 @@ def test_nothing_is_interpolated_into_the_sql():
     )
     for value in ("Netherlands", "nlrtm", "MSC", "2026-10-01"):
         assert value not in sql
-    assert "NL%" in params and "NLRTM" in params and "MSC" in params
+    assert ["NL%"] in params and "NLRTM" in params and "MSC" in params
 
 
 # ---------------------------------------------------------------------------
@@ -69,8 +69,32 @@ def test_no_filters_means_no_extra_clauses():
 
 def test_country_becomes_a_locode_prefix():
     sql, params = build_schedule_query(country="Netherlands")
-    assert "upper(pod_code) LIKE %s" in sql
-    assert "NL%" in params
+    assert "upper(btrim(pod_code)) LIKE ANY(%s::text[])" in sql
+    assert ["NL%"] in params
+
+
+def test_several_countries_are_ored_together():
+    sql, params = build_schedule_query(country=["Netherlands", " india ", "NETHERLANDS", ""])
+    assert sql.count("LIKE ANY") == 1
+    assert ["NL%", "IN%"] in params
+
+
+def test_unknown_countries_are_dropped_when_others_are_known():
+    sql, params = build_schedule_query(country=["Atlantis", "Italy"])
+    assert "FALSE" not in sql
+    assert ["IT%"] in params
+
+
+def test_several_ports_are_matched_by_name():
+    sql, params = build_schedule_query(port=[" Boston ", "new  york", "BOSTON"])
+    assert f"{ports.PORT_KEY_SQL} = ANY(%s::text[])" in sql
+    assert ["boston", "new york"] in params
+    assert "Boston" not in sql
+
+
+def test_country_and_port_are_anded():
+    where = where_for(country=["United States"], port=["Boston"])
+    assert "LIKE ANY" in where and "= ANY" in where and " AND " in where
 
 
 def test_unknown_country_matches_nothing():
@@ -264,3 +288,58 @@ def test_schedule_returns_shaped_rows(client, fake_db):
     assert body["data"]["count"] == 1
     assert body["data"]["truncated"] is False
     assert body["data"]["rows"][0]["country"] == "Netherlands"
+
+
+# ---------------------------------------------------------------------------
+# Dropdown options come from the data
+# ---------------------------------------------------------------------------
+def _sign_in(client, fake_db):
+    from app.services import security
+
+    fake_db.add_user("alok", security.hash_password("correct-horse-battery"))
+    client.post("/api/login", json={"username": "alok", "password": "correct-horse-battery"})
+
+
+def test_filter_options_are_built_from_the_rows(client, fake_db):
+    _sign_in(client, fake_db)
+    fake_db.rows = [
+        {"pod_code": "USBOS", "pod_name": "BOSTON", "carrier": "MSC", "n": 1},
+        {"pod_code": "", "pod_name": " Boston ", "carrier": "MSC", "n": 3},
+        {"pod_code": "USNYC", "pod_name": "New  York", "carrier": "CMA", "n": 2},
+        {"pod_code": "NLRTM", "pod_name": "Rotterdam", "carrier": "MSC", "n": 2},
+        {"pod_code": "NLRTM", "pod_name": "rotterdam", "carrier": "MSC", "n": 1},
+        {"pod_code": "", "pod_name": "", "carrier": "", "n": 1},
+    ]
+    data = client.get("/api/schedule/filters").json()["data"]
+
+    assert data["countries"] == ["Netherlands", "United States"]
+    assert data["ports"] == [
+        {"name": "Boston", "countries": ["United States"]},
+        {"name": "New York", "countries": ["United States"]},
+        {"name": "Rotterdam", "countries": ["Netherlands"]},
+    ]
+    assert data["carriers"] == ["CMA", "MSC"]
+
+
+def test_filter_ports_narrow_to_the_chosen_countries(client, fake_db):
+    _sign_in(client, fake_db)
+    fake_db.rows = [
+        {"pod_code": "USBOS", "pod_name": "Boston", "carrier": "MSC", "n": 1},
+        {"pod_code": "NLRTM", "pod_name": "Rotterdam", "carrier": "MSC", "n": 1},
+        {"pod_code": "INNSA", "pod_name": "Nhava Sheva", "carrier": "MSC", "n": 1},
+    ]
+    response = client.get("/api/schedule/filters", params=[("country", "united states"), ("country", "India")])
+    names = [p["name"] for p in response.json()["data"]["ports"]]
+    assert names == ["Boston", "Nhava Sheva"]
+
+
+def test_schedule_accepts_repeated_country_and_port(client, fake_db):
+    _sign_in(client, fake_db)
+    fake_db.rows = [dict(ROW)]
+    response = client.get(
+        "/api/schedule",
+        params=[("country", "Netherlands"), ("country", "Italy"), ("port", "Rotterdam"), ("port", "Genoa")],
+    )
+    assert response.status_code == 200
+    sql, params = fake_db.queries[-1]
+    assert ["NL%", "IT%"] in params and ["rotterdam", "genoa"] in params

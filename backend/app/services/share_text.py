@@ -12,6 +12,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 
 from app.config import settings
+from app.services import ports
 
 ORIGIN = "Nhava Sheva"
 DEFAULT_WHERE = "Europe & Mediterranean"
@@ -82,14 +83,37 @@ def type_label(ship_type: str | None) -> str:
     return {"direct": "Direct", "indirect": "Indirect"}.get(ship_type or "", "")
 
 
+def _names(values, limit: int = 3) -> str:
+    """'Boston, New York +2 more'."""
+    shown = ", ".join(values[:limit])
+    return f"{shown} +{len(values) - limit} more" if len(values) > limit else shown
+
+
+def _as_list(value) -> list[str]:
+    if not value:
+        return []
+    values = [value] if isinstance(value, str) else list(value)
+    return [v.strip() for v in values if v and v.strip()]
+
+
 def where_label(filters, rows: list[dict]) -> str:
     """Where the list is going, for the subject and summary — whereLabel()."""
     pod = (getattr(filters, "pod_code", None) or "").strip().upper()
     if pod:
         hit = next((r for r in rows if (r.get("pod_code") or "").upper() == pod), None)
         return destination(hit) if hit else DEFAULT_WHERE
-    country = (getattr(filters, "country", None) or "").strip()
-    return country or DEFAULT_WHERE
+    chosen_ports = _as_list(getattr(filters, "port", None))
+    if len(chosen_ports) == 1:
+        key = ports.port_key(chosen_ports[0])
+        hit = next(
+            (r for r in rows if ports.port_key(ports.port_label(r.get("pod_name"), r.get("pod_code"))) == key),
+            None,
+        )
+        return destination(hit) if hit else chosen_ports[0]
+    if chosen_ports:
+        return _names(chosen_ports)
+    countries = _as_list(getattr(filters, "country", None))
+    return _names(countries) if countries else DEFAULT_WHERE
 
 
 def plural(n: int) -> str:

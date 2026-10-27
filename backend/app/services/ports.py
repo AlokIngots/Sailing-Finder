@@ -121,4 +121,31 @@ def iso_for_country(country: str) -> str:
 
 def country_options(pod_codes) -> list[str]:
     """Sorted, de-duplicated country names for the dropdown."""
-    return sorted({c for c in (country_for_port(p) for p in pod_codes) if c})
+    return sorted({c for c in (country_for_port(p) for p in pod_codes) if c}, key=str.lower)
+
+
+# ---------------------------------------------------------------------------
+# Port identity
+# ---------------------------------------------------------------------------
+# A port is identified by its readable name, not its code. Scrapers disagree on
+# codes (or leave them blank) far more often than on names, and keying on the
+# code hid ports: a Boston row with no code, or with a code another port also
+# used, never reached the dropdown. The name falls back to the code when blank.
+#
+# PORT_KEY_SQL and port_key() are the same rule — trim, collapse inner
+# whitespace, lower-case — so what the dropdown offers and what the filter
+# matches can never disagree.
+PORT_KEY_SQL = (
+    r"lower(regexp_replace(btrim(coalesce(nullif(btrim(pod_name), ''), pod_code, '')),"
+    r" '\s+', ' ', 'g'))"
+)
+
+
+def port_label(pod_name: str | None, pod_code: str | None = None) -> str:
+    """'Boston' — the name with tidy whitespace, or the code when there is none."""
+    return " ".join((pod_name or "").split()) or " ".join((pod_code or "").split())
+
+
+def port_key(label: str | None) -> str:
+    """Case- and whitespace-insensitive identity for a port label."""
+    return " ".join((label or "").split()).lower()
